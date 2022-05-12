@@ -1,5 +1,5 @@
 {
-    "name": "Proposed_method_ver_1",
+    "name": "Proposed_method",
     "n_gpu": 1,
     "arch": {
         "type": "Proposed_method",
@@ -45,7 +45,7 @@
     ],
     "trainer": {
         "epochs": 100,
-        "save_dir": "saved_rev/",
+        "save_dir": "saved/",
         "save_period": 10,
         "verbosity": 2,
         "monitor": "max val_accuracy",
