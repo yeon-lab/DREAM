@@ -10,11 +10,11 @@ source activate local
 
 
 start=0
-end=`cat config_Proposed_method_ver_1.json | jq '.data_loader.args.num_folds'`
+end=`cat config.json | jq '.data_loader.args.num_folds'`
 end=$((end-1))
 
 for i in $(eval echo {$start..$end})
 do
-   python train_proposed_method.py --fold_id=$i --np_data_dir "data_npz/edf_20_fpzcz" --config "config_Proposed_method_ver_1.json"
+   python train.py --fold_id=$i --np_data_dir "data_npz/edf_20_fpzcz" --config "config.json"
 
 done  
