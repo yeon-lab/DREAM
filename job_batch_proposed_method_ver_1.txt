@@ -1,0 +1,20 @@
+#!/bin/bash
+#SBATCH --time=24:00:00
+#SBATCH --nodes=1 --ntasks-per-node=8 --gpus-per-node=1 --gpu_cmode=shared
+#SBATCH --job-name=proposed_ver_1
+#SBATCH --account=PCON0023
+
+module load python
+source activate local
+
+
+
+start=0
+end=`cat config_Proposed_method_ver_1.json | jq '.data_loader.args.num_folds'`
+end=$((end-1))
+
+for i in $(eval echo {$start..$end})
+do
+   python train_proposed_method.py --fold_id=$i --np_data_dir "data_npz/edf_20_fpzcz" --config "config_Proposed_method_ver_1.json"
+
+done  

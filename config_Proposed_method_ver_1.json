@@ -1,0 +1,54 @@
+{
+    "name": "Proposed_method_ver_1",
+    "n_gpu": 1,
+    "arch": {
+        "type": "Proposed_method",
+        "args": {}
+    },
+    "hyper_params": {
+        "seq_len": 10,
+        "num_classes": 5,
+        "is_CFR": true,
+        "hidden_dim": 128,
+        "dropout_rate": 0.1,
+        "levels": 3,
+        "kernel_size": 4,
+        "zd_dim": 64,
+        "zy_dim": 512,
+        "aux_loss_y": 1000,
+        "aux_loss_d": 1000,
+        "beta_d": 1,
+        "beta_x": 1,
+        "beta_y": 1,
+        "const_weight": 1,
+        "retraining_featurenet": false
+    },
+    "data_loader": {
+        "args": {
+            "batch_size": 128,
+            "num_folds": 20
+        }
+    },
+    "optimizer": {
+        "type": "Adam",
+        "args": {
+            "lr": 0.005,
+            "weight_decay": 0,
+            "amsgrad": false
+        }
+    },
+    "loss": "CrossEntropyLoss",
+    "metrics": [
+        "accuracy",
+        "f1",
+        "confusion"
+    ],
+    "trainer": {
+        "epochs": 100,
+        "save_dir": "saved_rev/",
+        "save_period": 10,
+        "verbosity": 2,
+        "monitor": "max val_accuracy",
+        "early_stop": 3
+    }
+}
