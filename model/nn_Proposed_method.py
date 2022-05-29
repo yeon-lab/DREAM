@@ -7,24 +7,21 @@ import torch.distributions as dist
 import random
 import numpy as np
 from TorchCRF import CRF
+from pytorch_metric_learning import losses
 
-#################################
-def contrastive_loss(features, y, n_classes=5):
-    batch_size = features.shape[0]
-    features = features.view(batch_size, -1)
-    features = F.normalize(features, dim=1)
-    mat = torch.matmul(features, features.T).detach().cpu().numpy()
-    loss_all = (np.exp(mat/1).sum().item()-len(features))/2
-    loss = 0
-    for class_ in range(n_classes):
-        index, = torch.where(y == class_)
-        index = index.cpu().numpy()
-        mat_ = torch.matmul(features[index], features[index].T).detach().cpu().numpy()
-        loss += (np.exp(mat_/1).sum().item()-len(index))/2
 
-    cont_loss= -np.log(loss/loss_all)
 
-    return cont_loss
+
+class SupervisedContrastiveLoss(nn.Module):
+    def __init__(self):
+        super(SupervisedContrastiveLoss, self).__init__()
+        self.tau = 0.07
+
+    def forward(self, feature_vectors, labels):
+        # Normalize feature vectors
+        logits = F.normalize(feature_vectors, p=2, dim=1)
+                
+        return losses.NTXentLoss(temperature=self.tau)(logits, torch.squeeze(labels))
     
     
     
@@ -269,6 +266,10 @@ class aux_layer(nn.Module):
 class DIVA(nn.Module):
     def __init__(self, zd_dim, zy_dim, n_domains, config, d_type):
         super(DIVA, self).__init__()
+        SEED = 1111
+        torch.manual_seed(SEED)
+        torch.backends.cudnn.deterministic = False
+        torch.backends.cudnn.benchmark = False
         self.zd_dim = zd_dim
         self.zx_dim = 0
         self.zy_dim = zy_dim
@@ -280,6 +281,8 @@ class DIVA(nn.Module):
             self.sampling_rate = 100
         elif d_type == 'shhs':
             self.sampling_rate = 125
+            
+        self.contrastive_loss = SupervisedContrastiveLoss()
             
 
         self.px = Decoder_ResNet(self.zd_dim, self.zx_dim, self.zy_dim, self.sampling_rate)
@@ -322,9 +325,6 @@ class DIVA(nn.Module):
         zy_q_loc, zy_q_scale = self.qzy(x)          # Encode
         qzy = dist.Normal(zy_q_loc, zy_q_scale)     # Reparameterization trick
         zy_q = qzy.rsample()
-        
-
-        
 
         # Decode
         x_recon = self.px(zx=zx_q, zy=zy_q, zd=zd_q)
@@ -385,7 +385,7 @@ class DIVA(nn.Module):
                + self.aux_loss_multiplier_y * CE_y
             
             class_y_losses += CE_y        
-            conts_losses += contrastive_loss(features, y_target)*self.const_weight
+            conts_losses += self.contrastive_loss(features, y_target)*self.const_weight
    
         
         all_losses = (DIVA_losses+conts_losses)/self.seq_len
@@ -495,6 +495,10 @@ class TemporalConvNet(nn.Module):
 class TCN(nn.Module):
     def __init__(self, input_size, num_channels, config, n_classes=5):
         super(TCN, self).__init__()
+        SEED = 1111
+        torch.manual_seed(SEED)
+        torch.backends.cudnn.deterministic = False
+        torch.backends.cudnn.benchmark = False
         
         self.batch_size = config["data_loader"]["args"]["batch_size"]
         
