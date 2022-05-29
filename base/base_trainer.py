@@ -2,7 +2,7 @@ import torch
 from abc import abstractmethod
 from numpy import inf
 import numpy as np
-
+import copy
 
 class BaseTrainer:
     """
@@ -29,7 +29,8 @@ class BaseTrainer:
         
         self.featurenet_best_params = None
         self.classifier_best_params = None
-
+        self.featurenet_best_from_finetune = None
+        
         cfg_trainer = config['trainer']
         self.epochs = cfg_trainer['epochs']
         self.save_period = cfg_trainer['save_period']
@@ -95,7 +96,7 @@ class BaseTrainer:
 
                 if improved:
                     self.mnt_best = log[self.mnt_metric]
-                    self.featurenet_best_params = self.feature_net.state_dict()
+                    self.featurenet_best_params = copy.deepcopy(self.feature_net.state_dict())
                     not_improved_count = 0
                 else:
                     not_improved_count += 1
@@ -106,8 +107,6 @@ class BaseTrainer:
                     self._save_checkpoint(epoch, finetune=False, save_best=True)
                     break
 
-            if epoch % self.save_period == 0:
-                self._save_checkpoint(epoch, finetune=False, save_best=False)
             if epoch == self.epochs:
                 self._save_checkpoint(epoch, finetune=False, save_best=True)   
                 
@@ -129,6 +128,7 @@ class BaseTrainer:
                 
         PATH = str(self.checkpoint_dir / 'featurenet_best.pth')
         self.feature_net.load_state_dict(torch.load(PATH)['state_dict'])
+        self.feature_net.eval()
         
         check_retraining = True
         for name, child in self.feature_net.named_children():
@@ -167,7 +167,10 @@ class BaseTrainer:
 
                 if improved:
                     self.mnt_best = log[self.mnt_metric]
-                    self.classifier_best_params = self.classifier.state_dict()
+                    self.classifier_best_params = copy.deepcopy(self.classifier.state_dict())
+                    if self.config['hyper_params']['retraining_featurenet']:
+                        self.featurenet_best_from_finetune = copy.deepcopy(self.feature_net.state_dict())
+                        
                     not_improved_count = 0
                 else:
                     not_improved_count += 1
@@ -178,8 +181,6 @@ class BaseTrainer:
                     self._save_checkpoint(epoch, finetune=True, save_best=True)
                     break
 
-            if epoch % self.save_period == 0:
-                self._save_checkpoint(epoch, finetune=True, save_best=False)
             if epoch == self.epochs:
                 self._save_checkpoint(epoch, finetune=True, save_best=True)   
                 
@@ -210,21 +211,14 @@ class BaseTrainer:
         if finetune is False:
             type_ = "featurenet"
             model = self.feature_net
-            if save_best:
-                state_dict = self.featurenet_best_params
-            else: 
-                state_dict = model.state_dict()
+            state_dict = self.featurenet_best_params
         else: 
             type_ = "classifier"
             model = self.classifier
-            if save_best:
-                state_dict = self.classifier_best_params
-            else: 
-                state_dict = model.state_dict()
-                
+            state_dict = self.classifier_best_params
+
         if state_dict is None:
             print("cannot find model parameters")
-            
 
         arch = type(model).__name__
         state = {
@@ -234,16 +228,31 @@ class BaseTrainer:
             'monitor_best': self.mnt_best,
             'config': self.config
         }
-
-        if save_best:
-            best_path = str(self.checkpoint_dir / '{}_best.pth'.format(type_))
-            torch.save(state, best_path)
-            self.logger.info("Saving current best: {}_best.pth ...".format(type_))
+        best_path = str(self.checkpoint_dir / '{}_best.pth'.format(type_))
+        torch.save(state, best_path)
+        self.logger.info("Saving current best: {}_best.pth ...".format(type_))
+        
+        filename = str(self.checkpoint_dir / '{}-checkpoint-epoch{}.pth'.format(type_, epoch))
+        torch.save(state, filename)
+        self.logger.info("Saving checkpoint: {} ...".format(filename))
             
-        else: 
-            filename = str(self.checkpoint_dir / '{}-checkpoint-epoch{}.pth'.format(type_, epoch))
-            torch.save(state, filename)
-            self.logger.info("Saving checkpoint: {} ...".format(filename))
+        if finetune and save_best:    
+            if self.config['hyper_params']['retraining_featurenet']:
+                type_ = 'retrained_featurenet'
+                model = self.feature_net
+                state_dict = self.featurenet_best_from_finetune 
+                arch = type(model).__name__
+                state = {
+                    'arch': arch,
+                    'epoch': epoch,
+                    'state_dict': state_dict,
+                    'monitor_best': self.mnt_best,
+                    'config': self.config
+                }
+                best_path = str(self.checkpoint_dir / '{}_best.pth'.format(type_))
+                torch.save(state, best_path)
+                self.logger.info("Saving current best: {}_best.pth ...".format(type_))
+            
 
     def _resume_checkpoint(self, resume_path):
         """
@@ -271,3 +280,5 @@ class BaseTrainer:
             self.optimizer.load_state_dict(checkpoint['optimizer'])
 
         self.logger.info("Checkpoint loaded. Resume training from epoch {}".format(self.start_epoch))
+        
+        
