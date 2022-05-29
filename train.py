@@ -2,17 +2,24 @@ import argparse
 import collections
 import numpy as np
 
-from data_loader.data_loader import *
+from data_loader.data_loader_proposed_method import *
 import model.loss as module_loss
 import model.metric as module_metric
 from parse_config import ConfigParser
-from trainer.trainer import Trainer
+from trainer.trainer_proposed_method import Trainer
 from utils.util import *
 from model.nn_Proposed_method import *
 
 import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader
+
+
+# fix random seeds for reproducibility
+SEED = 1111
+torch.manual_seed(SEED)
+torch.backends.cudnn.deterministic = False
+torch.backends.cudnn.benchmark = False
 
 
 
@@ -22,6 +29,12 @@ def main(config, fold_id, data_config):
     logger.info("fold id:{}".format(fold_id))
     logger.info('-'*100)
     for key, value in config['hyper_params'].items():
+        logger.info('    {:25s}: {}'.format(str(key), value))
+    for key, value in config['data_loader']['args'].items():
+        logger.info('    {:25s}: {}'.format(str(key), value))
+    for key, value in config['optimizer']['args'].items():
+        logger.info('    {:25s}: {}'.format(str(key), value))
+    for key, value in config['trainer'].items():
         logger.info('    {:25s}: {}'.format(str(key), value))
     logger.info("-"*100)
     
