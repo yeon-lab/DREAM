@@ -1,6 +1,6 @@
 import numpy as np
 import torch
-from base.base_trainer import BaseTrainer
+from base.base_trainer_proposed_method import BaseTrainer
 from utils import inf_loop, MetricTracker
 import torch.nn as nn
 from sklearn.metrics import confusion_matrix, f1_score, accuracy_score
@@ -121,8 +121,10 @@ class Trainer(BaseTrainer):
         """
         PATH = str(self.checkpoint_dir / 'featurenet_best.pth')
         self.feature_net.load_state_dict(torch.load(PATH)['state_dict'])
-
         self.feature_net.eval()
+        
+        val_log = self._valid_feature_net()
+        
         self.test_metrics.reset()
         with torch.no_grad():
             outs = np.array([])
@@ -143,7 +145,6 @@ class Trainer(BaseTrainer):
         for met in self.metric_ftns:
             self.test_metrics.update(met.__name__, met(outs.reshape(-1,1), trgs.reshape(-1,1)))
         test_log = self.test_metrics.result()
-        val_log = self._valid_feature_net()
         
         log = {}
         log.update(**{'val_' + k: v for k, v in val_log.items()})
@@ -163,8 +164,6 @@ class Trainer(BaseTrainer):
 
         if self.config['hyper_params']['retraining_featurenet']:
             self.feature_net.train()
-        else:
-            self.feature_net.eval()
         
         self.classifier.train()
         self.train_metrics.reset()
@@ -257,14 +256,18 @@ class Trainer(BaseTrainer):
         return self.valid_metrics.result()
     
     def _test_classifier(self):
-        PATH_f = str(self.checkpoint_dir / 'featurenet_best.pth')
+        if self.config['hyper_params']['retraining_featurenet']:
+            PATH_f = str(self.checkpoint_dir / 'retrained_featurenet_best.pth')
+        else:
+            PATH_f = str(self.checkpoint_dir / 'featurenet_best.pth')
         self.feature_net.load_state_dict(torch.load(PATH_f)['state_dict'])
-
+        self.feature_net.eval()
+            
         PATH_c = str(self.checkpoint_dir / 'classifier_best.pth')
         self.classifier.load_state_dict(torch.load(PATH_c)['state_dict'])
-
-        self.feature_net.eval()
         self.classifier.eval()
+        
+        val_log = self._valid_classifier()
         
         self.test_metrics.reset()
         with torch.no_grad():
@@ -291,7 +294,6 @@ class Trainer(BaseTrainer):
         for met in self.metric_ftns:
             self.test_metrics.update(met.__name__, met(outs.reshape(-1,1), trgs.reshape(-1,1)))
         test_log = self.test_metrics.result()
-        val_log = self._valid_classifier()
         
         log = {}
         log.update(**{'val_' + k: v for k, v in val_log.items()})
