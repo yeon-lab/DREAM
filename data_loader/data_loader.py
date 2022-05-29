@@ -34,10 +34,10 @@ class SleepDataLoader(Dataset):
     def __getitem__(self, idx):
         file_idx, domain_idx, idx, seq_len = self.epochs[idx]
         
-        inputs = self.inputs[file_idx][idx:idx+seq_len]
+        inputs = self.inputs[file_idx][idx*seq_len:(idx+1)*seq_len]
         inputs = torch.from_numpy(inputs).float()
         
-        labels = self.labels[file_idx][idx:idx+seq_len]
+        labels = self.labels[file_idx][idx*seq_len:(idx+1)*seq_len]
         labels = torch.from_numpy(labels).long()
         
         if self.check_shape and self.phase == 'train':
@@ -60,7 +60,7 @@ class SleepDataLoader(Dataset):
             labels.append(npz_file['y'])
             all_ys = np.append(all_ys, npz_file['y'])
             
-            epoch_size = len(npz_file['x']) - self.seq_len + 1
+            epoch_size = len(npz_file['x']) // self.seq_len
             for i in range(epoch_size):
                 epochs.append([file_idx, file_idx, i, self.seq_len])
                 
@@ -88,7 +88,7 @@ class SleepDataLoader(Dataset):
                 labels.append(npz_file['y'])
                 all_ys = np.append(all_ys, npz_file['y'])
         
-                epoch_size = len(npz_file['x']) - self.seq_len + 1
+                epoch_size = len(npz_file['x']) // self.seq_len
                 for i in range(epoch_size):
                     epochs.append([file_idx, domain_idx, i, self.seq_len])
                     
