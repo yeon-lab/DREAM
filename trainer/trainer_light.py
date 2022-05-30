@@ -1,6 +1,6 @@
 import numpy as np
 import torch
-from base.base_trainer_rev import BaseTrainer
+from base.base_trainer import BaseTrainer
 from utils import inf_loop, MetricTracker
 import torch.nn as nn
 
