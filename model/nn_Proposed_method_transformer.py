@@ -7,15 +7,14 @@ import numpy as np
 from TorchCRF import CRF
 from pytorch_metric_learning import losses
 
+##### SupervisedContrastiveLoss
 class SupervisedContrastiveLoss(nn.Module):
     def __init__(self):
         super(SupervisedContrastiveLoss, self).__init__()
         self.tau = 0.07
-
     def forward(self, feature_vectors, labels):
         # Normalize feature vectors
-        logits = F.normalize(feature_vectors, p=2, dim=1)
-                
+        logits = F.normalize(feature_vectors, p=2, dim=1)             
         return losses.NTXentLoss(temperature=self.tau)(logits, torch.squeeze(labels))
 
 def conv3(in_planes, out_planes, stride=1):
@@ -23,7 +22,6 @@ def conv3(in_planes, out_planes, stride=1):
 
 class Bottleneck(nn.Module):
     expansion = 4
-
     def __init__(self, inplanes, planes, stride=1, downsample=None):
         super(Bottleneck, self).__init__()
         self.conv1 = nn.Conv1d(inplanes, planes, kernel_size=1, bias=False)
@@ -36,39 +34,27 @@ class Bottleneck(nn.Module):
         self.relu = nn.ReLU(inplace=True)
         self.downsample = downsample
         self.stride = stride
-
     def forward(self, x):
         residual = x
-
         out = self.conv1(x)
         out = self.bn1(out)
         out = self.relu(out)
-
         out = self.conv2(out)
         out = self.bn2(out)
         out = self.relu(out)
-
         out = self.conv3(out)
         out = self.bn3(out)
-
         if self.downsample is not None:
             residual = self.downsample(x)
-
         out += residual
         out = self.relu(out)
-
         return out
 
-    
-### Follows model as seen in LEARNING ROBUST REPRESENTATIONS BY PROJECTING SUPERFICIAL STATISTICS OUT
-
-# Decoders
+##### Decoders
 class Decoder_ResNet(nn.Module):
     def __init__(self, zd_dim, zx_dim, zy_dim, sampling_rate):
         super(Decoder_ResNet, self).__init__()
-        
         self.upsample1=nn.Upsample(scale_factor=2)
-        
         if sampling_rate == 100:
             self.dfc2 = nn.Linear(zd_dim + zx_dim + zy_dim, 6016)
             self.bn2 = nn.BatchNorm1d(6016)
@@ -77,7 +63,7 @@ class Decoder_ResNet(nn.Module):
             self.dconv3 = nn.ConvTranspose1d(32, 16, 3, padding = 1)
             self.dconv2 = nn.ConvTranspose1d(16, 16, 5, padding = 3)
             self.dconv1 = nn.ConvTranspose1d(16, 1, 12, stride = 4, padding =0)
-        else: 
+        else: ### sampling_rate == 125
             self.dfc2 = nn.Linear(zd_dim + zx_dim + zy_dim, 7552)
             self.bn2 = nn.BatchNorm1d(7552)
             self.dfc1 = nn.Linear(7552, 32*1*117)
@@ -86,7 +72,6 @@ class Decoder_ResNet(nn.Module):
             self.dconv3 = nn.ConvTranspose1d(32, 16, 3, padding = 1)
             self.dconv2 = nn.ConvTranspose1d(16, 16, 5, padding = 2)
             self.dconv1 = nn.ConvTranspose1d(16, 1, 12, stride = 4, padding = 1)
-
         for m in self.modules():
             if isinstance(m, nn.ConvTranspose1d):
                 nn.init.kaiming_normal_(m.weight, mode='fan_out', nonlinearity='relu')
@@ -96,14 +81,12 @@ class Decoder_ResNet(nn.Module):
             elif isinstance(m, nn.Linear):
                 nn.init.xavier_uniform_(m.weight)
                 nn.init.constant_(m.bias, 0)
-                
 
     def forward(self, zx, zy, zd): 
         if zx is None:
             x = torch.cat((zd, zy), dim=-1)
         else:
             x = torch.cat((zd, zx, zy), dim=-1)
-            
         batch_size = x.shape[0]
         x = self.dfc2(x)
         x = F.relu(self.bn2(x))
@@ -118,35 +101,29 @@ class Decoder_ResNet(nn.Module):
         x = torch.sigmoid(self.dconv1(x))
         return x
     
-
+#### prior network
 class p_decoder(nn.Module):
     def __init__(self, in_dim, out_dim):
         super(p_decoder, self).__init__()
         self.fc1 = nn.Sequential(nn.Linear(in_dim, out_dim, bias=False), nn.BatchNorm1d(out_dim), nn.ReLU())
         self.fc21 = nn.Sequential(nn.Linear(out_dim, out_dim))
         self.fc22 = nn.Sequential(nn.Linear(out_dim, out_dim), nn.Softplus())
-
         torch.nn.init.xavier_uniform_(self.fc1[0].weight)
         torch.nn.init.xavier_uniform_(self.fc21[0].weight)
         self.fc21[0].bias.data.zero_()
         torch.nn.init.xavier_uniform_(self.fc22[0].weight)
         self.fc22[0].bias.data.zero_()
-
     def forward(self, x):
         x = self.fc1(x)
         loc = self.fc21(x)
         scale = self.fc22(x) + 1e-7
-
         return loc, scale
 
 
 # Encoders
 class Encoder_ResNet(nn.Module):
-
     def __init__(self, out_dim, sampling_rate):
-
         super(Encoder_ResNet, self).__init__()
-
         self.layer_config_dict = {
             18: [2, 2, 2, 2],
             34: [3, 4, 6, 3],
@@ -162,17 +139,14 @@ class Encoder_ResNet(nn.Module):
             nn.BatchNorm1d(16),
             nn.ReLU(),
             nn.MaxPool1d(3, 2, 1))
-
         self.layer1 = self._make_layer(Bottleneck, 16, self.layers[0], stride=1, first=True)
         self.layer2 = self._make_layer(Bottleneck, 16, self.layers[1], stride=2)
         self.layer3 = self._make_layer(Bottleneck, 32, self.layers[2], stride=2)
         self.layer4 = self._make_layer(Bottleneck, 32, self.layers[3], stride=2)
         self.maxpool = nn.MaxPool1d(3, 2, 1)
-
         self.dropout = nn.Dropout(p=0.01)
         
-        x = torch.rand((2,1,sampling_rate*30))
-                
+        x = torch.rand((2,1,sampling_rate*30))      
         x = self.initial_layer(x)
         x = self.layer1(x)
         x = self.layer2(x)
@@ -198,14 +172,12 @@ class Encoder_ResNet(nn.Module):
         self.fc12[0].bias.data.zero_()
 
     def _make_layer(self, block, planes, blocks, stride=1, first=False):
-
         downsample = None
         if (stride != 1 and first is False) or self.inplanes != planes * block.expansion:
             downsample = nn.Sequential(
                 nn.Conv1d(self.inplanes, planes * block.expansion, 1, stride, bias=False),
                 nn.BatchNorm1d(planes * block.expansion)
             )
-
         layers = []
         layers.append(block(self.inplanes, planes, stride, downsample))
         self.inplanes = planes * block.expansion
@@ -224,16 +196,11 @@ class Encoder_ResNet(nn.Module):
         x = self.layer4(x)
         x = self.dropout(x)
         x = x.view(batch_size, -1)
-        
         loc = self.fc11(x)
         scale = self.fc12(x) + 1e-7
-
         return loc, scale   # (batch_size, out_dim)
 
-
-
-
-# Auxiliary tasks
+# Auxiliary networks
 class aux_layer(nn.Module):
     def __init__(self, in_dim, out_dim):
         super(aux_layer, self).__init__()
@@ -246,9 +213,7 @@ class aux_layer(nn.Module):
     def forward(self, x):
         h = F.relu(x)
         loc = self.fc(h)
-
         return loc
-
 
 class VAE(nn.Module):
     def __init__(self, zd_dim, zy_dim, n_domains, config, d_type):
@@ -271,7 +236,6 @@ class VAE(nn.Module):
             
         self.contrastive_loss = SupervisedContrastiveLoss()
             
-
         self.px = Decoder_ResNet(self.zd_dim, self.zx_dim, self.zy_dim, self.sampling_rate)
         self.pzd = p_decoder(self.d_dim, self.zd_dim)
         self.pzy = p_decoder(self.y_dim, self.zy_dim)
@@ -338,7 +302,7 @@ class VAE(nn.Module):
         return x_recon, d_hat, y_hat, qzd, pzd, zd_q, qzx, pzx, zx_q, qzy, pzy, zy_q, zy_q_loc
 
     def get_losses(self, x, y, d):        
-        DIVA_losses, conts_losses, CE_class, CE_domain = 0, 0, 0, 0
+        VAE_losses, conts_losses, CE_class, CE_domain = 0, 0, 0, 0
         KL_domain, KL_class, reconst_losses = 0, 0, 0
         
         d_target = d
@@ -365,7 +329,7 @@ class VAE(nn.Module):
             CE_d = F.cross_entropy(d_hat, d_target, reduction='sum')
             CE_y = F.cross_entropy(y_hat, y_target, reduction='sum')
 
-            DIVA_losses += CE_x \
+            VAE_losses += CE_x \
                - self.beta_d * zd_p_minus_zd_q \
                - self.beta_x * KL_zx \
                - self.beta_y * zy_p_minus_zy_q \
@@ -375,18 +339,12 @@ class VAE(nn.Module):
             CE_class += CE_y    
             CE_domain += CE_d
             reconst_losses += CE_x
-            
             conts_losses += self.contrastive_loss(features, y_target)*self.const_weight
-            
             KL_domain += zd_p_minus_zd_q
             KL_class += zy_p_minus_zy_q
    
-        
-        all_losses = (DIVA_losses+conts_losses)/self.seq_len
-        
-
-        return all_losses, DIVA_losses/self.seq_len, CE_class/self.seq_len, CE_domain/self.seq_len, conts_losses/self.seq_len, KL_domain/self.seq_len, KL_class/self.seq_len, reconst_losses/self.seq_len
-
+        all_losses = (VAE_losses+conts_losses)/self.seq_len
+        return all_losses, VAE_losses/self.seq_len, CE_class/self.seq_len, CE_domain/self.seq_len, conts_losses/self.seq_len, KL_domain/self.seq_len, KL_class/self.seq_len, reconst_losses/self.seq_len
 
 
     def get_features(self, x):
@@ -399,7 +357,6 @@ class VAE(nn.Module):
 
         out = torch.cat(f_seq, dim=1)
         return out # (batch_size,len, n_feat)   
-    
     
     def predict(self, x):
         batch_size = x.size(0)
