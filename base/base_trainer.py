@@ -2,25 +2,35 @@ import torch
 from abc import abstractmethod
 from numpy import inf
 import numpy as np
+import copy
 
 class BaseTrainer:
     """
     Base class for all trainers
     """
-    def __init__(self, model, criterion, metric_ftns, optimizer, config, fold_id):
+    def __init__(self, feature_net, classifier, featurenet_optimizer, classifier_optimizer, 
+                 criterion, metric_ftns, config, fold_id):
         self.config = config
         self.logger = config.get_logger('trainer', config['trainer']['verbosity'])
 
-        # setup GPU device if available, move model into configured device
         self.device, device_ids = self._prepare_device(config['n_gpu'])
-        self.model = model.to(self.device)
+        
+        self.feature_net = feature_net.to(self.device)
+        self.classifier = classifier.to(self.device)
+        
         if len(device_ids) > 1:
-            self.model = torch.nn.DataParallel(model, device_ids=device_ids)
+            self.feature_net = torch.nn.DataParallel(self.feature_net, device_ids=device_ids)
+            self.classifier = torch.nn.DataParallel(self.classifier, device_ids=device_ids)
 
         self.criterion = criterion
         self.metric_ftns = metric_ftns
-        self.optimizer = optimizer
-
+        self.featurenet_optimizer = featurenet_optimizer
+        self.classifier_optimizer = classifier_optimizer
+        
+        self.featurenet_best_params = None
+        self.classifier_best_params = None
+        self.featurenet_best_from_finetune = None
+        
         cfg_trainer = config['trainer']
         self.epochs = cfg_trainer['epochs']
         self.save_period = cfg_trainer['save_period']
@@ -56,12 +66,12 @@ class BaseTrainer:
 
     def train(self):
         """
-        Full training logic
+        Full training logic for representation learning
         """
         not_improved_count = 0
 
         for epoch in range(self.start_epoch, self.epochs + 1):
-            result = self._train_epoch(epoch)
+            result = self._train_feature_net(epoch)
 
             # save logged informations into log dict
             log = {'epoch': epoch}
@@ -76,8 +86,8 @@ class BaseTrainer:
             if self.mnt_mode != 'off':
                 try:
                     # check whether model performance improved or not, according to specified metric(mnt_metric)
-                    improved = (self.mnt_mode == 'min' and log[self.mnt_metric] <= self.mnt_best) or \
-                               (self.mnt_mode == 'max' and log[self.mnt_metric] >= self.mnt_best)
+                    improved = (self.mnt_mode == 'min' and log[self.mnt_metric] < self.mnt_best) or \
+                               (self.mnt_mode == 'max' and log[self.mnt_metric] > self.mnt_best)
                 except KeyError:
                     self.logger.warning("Warning: Metric '{}' is not found. "
                                         "Model performance monitoring is disabled.".format(self.mnt_metric))
@@ -86,28 +96,92 @@ class BaseTrainer:
 
                 if improved:
                     self.mnt_best = log[self.mnt_metric]
+                    self.featurenet_best_params = copy.deepcopy(self.feature_net.state_dict())
                     not_improved_count = 0
-                    best = True
                 else:
                     not_improved_count += 1
 
                 if not_improved_count > self.early_stop:
                     self.logger.info("Validation performance didn\'t improve for {} epochs. "
                                      "Training stops.".format(self.early_stop))
-                    self._save_checkpoint(epoch, save_best=True)
+                    self._save_checkpoint(epoch, finetune=False, save_best=True)
                     break
 
-            if epoch % self.save_period == 0:
-                self._save_checkpoint(epoch, save_best=False)
             if epoch == self.epochs:
-                self._save_checkpoint(epoch, save_best=True)   
+                self._save_checkpoint(epoch, finetune=False, save_best=True)   
                 
         
         if self.do_test:      
-            self._test()
-
+            self._test_feature_net()
+        
+       
+        self.fine_tuning()
                      
-            
+    def fine_tuning(self):
+        """
+        Full training logic
+        """
+        self.logger.info('='*100)
+        self.logger.info('Start finetuning!')
+        
+        self.mnt_best = inf if self.mnt_mode == 'min' else -inf
+                
+        PATH = str(self.checkpoint_dir / 'featurenet_best.pth')
+        self.feature_net.load_state_dict(torch.load(PATH)['state_dict'])
+        self.feature_net.eval()
+        
+        check_retraining = True
+        for name, child in self.feature_net.named_children():
+            for param in child.parameters():
+                param.requires_grad = False 
+
+        not_improved_count = 0
+        for epoch in range(self.start_epoch, self.epochs + 1):
+            result = self._train_classifier(epoch)
+
+            # save logged informations into log dict
+            log = {'epoch': epoch}
+            log.update(result)
+
+            # print logged informations to the screen
+            for key, value in log.items():
+                self.logger.info('    {:15s}: {}'.format(str(key), value))
+
+            # evaluate model performance according to configured metric, save best checkpoint as model_best
+            if self.mnt_mode != 'off':
+                try:
+                    # check whether model performance improved or not, according to specified metric(mnt_metric)
+                    improved = (self.mnt_mode == 'min' and log[self.mnt_metric] < self.mnt_best) or \
+                               (self.mnt_mode == 'max' and log[self.mnt_metric] > self.mnt_best)
+                except KeyError:
+                    self.logger.warning("Warning: Metric '{}' is not found. "
+                                        "Model performance monitoring is disabled.".format(self.mnt_metric))
+                    self.mnt_mode = 'off'
+                    improved = False
+
+                if improved:
+                    self.mnt_best = log[self.mnt_metric]
+                    self.classifier_best_params = copy.deepcopy(self.classifier.state_dict())
+                    if self.config['hyper_params']['retraining_featurenet']:
+                        self.featurenet_best_from_finetune = copy.deepcopy(self.feature_net.state_dict())
+                        
+                    not_improved_count = 0
+                else:
+                    not_improved_count += 1
+
+                if not_improved_count > self.early_stop:
+                    self.logger.info("Validation performance didn\'t improve for {} epochs. "
+                                     "Training stops.".format(self.early_stop))
+                    self._save_checkpoint(epoch, finetune=True, save_best=True)
+                    break
+
+            if epoch == self.epochs:
+                self._save_checkpoint(epoch, finetune=True, save_best=True)   
+                
+        
+        if self.do_test:      
+            self._test_classifier()
+        
     def _prepare_device(self, n_gpu_use):
         """
         setup GPU device if available, move model into configured device
@@ -125,30 +199,37 @@ class BaseTrainer:
         list_ids = list(range(n_gpu_use))
         return device, list_ids
 
-    def _save_checkpoint(self, epoch, save_best=True):
-        """
-        Saving checkpoints
+    def _save_checkpoint(self, epoch, finetune=False, save_best=False):
+        state_dict = None
+        
+        if finetune is False:
+            type_ = "featurenet"
+            model = self.feature_net
+            state_dict = self.featurenet_best_params
+        else: 
+            type_ = "classifier"
+            model = self.classifier
+            state_dict = self.classifier_best_params
 
-        :param epoch: current epoch number
-        :param log: logging information of the epoch
-        :param save_best: if True, rename the saved checkpoint to 'model_best.pth'
-        """
-        arch = type(self.model).__name__
+        if state_dict is None:
+            print("cannot find model parameters")
+
+        arch = type(model).__name__
         state = {
             'arch': arch,
             'epoch': epoch,
-            'state_dict': self.model.state_dict(),
-            'optimizer': self.optimizer.state_dict(),
+            'state_dict': state_dict,
             'monitor_best': self.mnt_best,
             'config': self.config
         }
-        filename = str(self.checkpoint_dir / 'checkpoint-epoch{}.pth'.format(epoch))
+        best_path = str(self.checkpoint_dir / '{}_best.pth'.format(type_))
+        torch.save(state, best_path)
+        self.logger.info("Saving current best: {}_best.pth ...".format(type_))
+        
+        filename = str(self.checkpoint_dir / '{}-checkpoint-epoch{}.pth'.format(type_, epoch))
         torch.save(state, filename)
         self.logger.info("Saving checkpoint: {} ...".format(filename))
-        if save_best:
-            best_path = str(self.checkpoint_dir / 'model_best.pth')
-            torch.save(state, best_path)
-            self.logger.info("Saving current best: model_best.pth ...")
+            
 
     def _resume_checkpoint(self, resume_path):
         """
@@ -176,3 +257,5 @@ class BaseTrainer:
             self.optimizer.load_state_dict(checkpoint['optimizer'])
 
         self.logger.info("Checkpoint loaded. Resume training from epoch {}".format(self.start_epoch))
+        
+        
