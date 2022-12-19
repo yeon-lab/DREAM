@@ -21,7 +21,6 @@ torch.manual_seed(SEED)
 torch.backends.cudnn.deterministic = False
 torch.backends.cudnn.benchmark = False
 
-
 def main(config, fold_id, data_config):
     logger = config.get_logger('train') 
     logger.info('='*100)
@@ -52,15 +51,14 @@ def main(config, fold_id, data_config):
     n_domains = train_dataset.n_domains
     
     # build model architecture, initialize weights, then print to console  
-    
-    num_channels = [params['hidden_dim']]* params['levels']
-    
+   
     feature_net = VAE(params['zd_dim'] , params['zy_dim'], n_domains, config, data_config['d_type']) 
-    classifier = TCN(input_size=params['zy_dim'], num_channels=num_channels, config=config) 
+    classifier = Transformer(input_size=params['zy_dim'], config=config) 
 
     logger.info(feature_net)
     logger.info(classifier)
     logger.info("-"*100)
+
 
     # get function handles of loss and metrics
     criterion = getattr(module_loss, config['loss'])
@@ -73,9 +71,14 @@ def main(config, fold_id, data_config):
     featurenet_optimizer = config.init_obj('optimizer', torch.optim, featurenet_parameters)
     classifier_optimizer = config.init_obj('optimizer', torch.optim, classifier_parameters)
     
-
-    reduce_lr = False
+    try:
+        reduce_lr = params['reduce_lr']
+        print('reduce_lr is applied.')
+    except:
+        reduce_lr = False
+        print('reduce_lr is not applied.')
     
+    print('reduce_lr:', reduce_lr)
     trainer = Trainer(feature_net, classifier, 
                       featurenet_optimizer, classifier_optimizer,
                       criterion, metrics,
