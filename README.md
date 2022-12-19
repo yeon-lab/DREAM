@@ -13,4 +13,4 @@ Domain Invariant Representation Learning and Sleep Dynamics Modeling for Automat
 ```python 
 python train.py --fold_id=0 --np_data_dir "data_npz/edf_20_fpzcz" --config "config.json"
 ```
-Hyper-parameters are described in "config.json":
+Hyper-parameters are described in config.json
