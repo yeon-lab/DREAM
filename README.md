@@ -18,8 +18,67 @@ Figure 1: Overall architecture of **DREAM**
 
 
 
-## Train and Test
+## Usage
+
+### Hyper-parameters
+Hyper-parameters are described in config.json
+```python 
+{
+    "name": "DREAM_shhs",
+    "n_gpu": 1,
+    "arch": {
+        "type": "DREAM",
+        "args": {}
+    },
+    "hyper_params": {
+        "seq_len": 10,
+        "num_classes": 5,
+        "is_CFR": true,
+        "hidden_dim": 32,
+        "dropout_rate": 0,
+        "levels": 3,
+        "kernel_size": 4,
+        "zd_dim": 64,
+        "zy_dim": 256,
+        "aux_loss_y": 1000,
+        "aux_loss_d": 3000,
+        "beta_d": 1,
+        "beta_x": 1,
+        "beta_y": 1,
+        "const_weight": 2000
+    },
+    "data_loader": {
+        "args": {
+            "batch_size": 64,
+            "num_folds": 5
+        }
+    },
+    "optimizer": {
+        "type": "Adam",
+        "args": {
+            "lr": 0.001,
+            "weight_decay": 0,
+            "amsgrad": false
+        }
+    },
+    "loss": "CrossEntropyLoss",
+    "metrics": [
+        "accuracy",
+        "f1",
+        "confusion"
+    ],
+    "trainer": {
+        "epochs": 100,
+        "save_dir": "saved/",
+        "save_period": 10,
+        "verbosity": 2,
+        "monitor": "max val_accuracy",
+        "early_stop": 5
+    }
+}
+```
+
+### Training and test
 ```python 
 python train.py --fold_id=0 --np_data_dir "data_npz/edf_20_fpzcz" --config "config.json"
 ```
-Hyper-parameters are described in config.json
