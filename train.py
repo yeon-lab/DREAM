@@ -120,7 +120,7 @@ if __name__ == '__main__':
         data_config['d_type'] = 'shhs'
         data_config['sampling_rate'] = 125
     else:
-        folds_data = load_edf_folds_proposed_method(args2.np_data_dir, config["data_loader"]["args"]["num_folds"], fold_id)
+        folds_data = load_edf_folds(args2.np_data_dir, config["data_loader"]["args"]["num_folds"], fold_id)
         data_config['d_type'] = 'edf'
         data_config['sampling_rate'] = 100
     
