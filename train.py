@@ -8,7 +8,7 @@ import model.metric as module_metric
 from parse_config import ConfigParser
 from trainer.trainer import Trainer
 from utils.util import *
-from model.model import *
+from model.DREAM import *
 
 import torch
 import torch.nn as nn
