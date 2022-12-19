@@ -59,9 +59,6 @@ class Bottleneck(nn.Module):
 
         return out
 
-
-
-       
     
 ### Follows model as seen in LEARNING ROBUST REPRESENTATIONS BY PROJECTING SUPERFICIAL STATISTICS OUT
 
@@ -253,9 +250,9 @@ class aux_layer(nn.Module):
         return loc
 
 
-class DIVA(nn.Module):
+class VAE(nn.Module):
     def __init__(self, zd_dim, zy_dim, n_domains, config, d_type):
-        super(DIVA, self).__init__()
+        super(VAE, self).__init__()
         SEED = 1111
         torch.manual_seed(SEED)
         torch.backends.cudnn.deterministic = False
@@ -341,7 +338,8 @@ class DIVA(nn.Module):
         return x_recon, d_hat, y_hat, qzd, pzd, zd_q, qzx, pzx, zx_q, qzy, pzy, zy_q, zy_q_loc
 
     def get_losses(self, x, y, d):        
-        DIVA_losses, class_y_losses, conts_losses = 0, 0, 0
+        DIVA_losses, conts_losses, CE_class, CE_domain = 0, 0, 0, 0
+        KL_domain, KL_class, reconst_losses = 0, 0, 0
         
         d_target = d
         d_input = F.one_hot(d, num_classes= self.d_dim).float()
@@ -374,14 +372,22 @@ class DIVA(nn.Module):
                + self.aux_loss_multiplier_d * CE_d \
                + self.aux_loss_multiplier_y * CE_y
             
-            class_y_losses += CE_y        
+            CE_class += CE_y    
+            CE_domain += CE_d
+            reconst_losses += CE_x
+            
             conts_losses += self.contrastive_loss(features, y_target)*self.const_weight
+            
+            KL_domain += zd_p_minus_zd_q
+            KL_class += zy_p_minus_zy_q
    
         
         all_losses = (DIVA_losses+conts_losses)/self.seq_len
         
 
-        return all_losses, class_y_losses/self.seq_len, conts_losses/self.seq_len
+        return all_losses, DIVA_losses/self.seq_len, CE_class/self.seq_len, CE_domain/self.seq_len, conts_losses/self.seq_len, KL_domain/self.seq_len, KL_class/self.seq_len, reconst_losses/self.seq_len
+
+
 
     def get_features(self, x):
         batch_size = x.size(0)
