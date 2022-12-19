@@ -28,57 +28,14 @@ python train.py --fold_id=0 --np_data_dir "data_npz/edf_20_fpzcz" --config "conf
 ### Hyper-parameters
 Hyper-parameters are set in config.json
 ```python 
-{
-    "name": "DREAM_shhs",
-    "n_gpu": 1,
-    "arch": {
-        "type": "DREAM",
-        "args": {}
-    },
-    "hyper_params": {
-        "seq_len": 10,
-        "num_classes": 5,
-        "is_CFR": true,
-        "hidden_dim": 32,
-        "dropout_rate": 0,
-        "levels": 3,
-        "kernel_size": 4,
-        "zd_dim": 64,
-        "zy_dim": 256,
-        "aux_loss_y": 1000,
-        "aux_loss_d": 3000,
-        "beta_d": 1,
-        "beta_x": 1,
-        "beta_y": 1,
-        "const_weight": 2000
-    },
-    "data_loader": {
-        "args": {
-            "batch_size": 64,
-            "num_folds": 5
-        }
-    },
-    "optimizer": {
-        "type": "Adam",
-        "args": {
-            "lr": 0.001,
-            "weight_decay": 0,
-            "amsgrad": false
-        }
-    },
-    "loss": "CrossEntropyLoss",
-    "metrics": [
-        "accuracy",
-        "f1",
-        "confusion"
-    ],
-    "trainer": {
-        "epochs": 100,
-        "save_dir": "saved/",
-        "save_period": 10,
-        "verbosity": 2,
-        "monitor": "max val_accuracy",
-        "early_stop": 5
-    }
-}
+* seq_len: Length of input sequence for classification network
+* dim_feedforward: the dimension of the feedforward network model in Transformer encoder layer
+* n_layers: the number of encoder layers in Transformer
+* zd_dim and zy_dim: output dimensions of subject and class encoders, respectively
+* aux_loss_d and aux_loss_y: weights to control auxiliary losses for subject and class, respectively
+* beta_d and beta_y: weights to control KL losses for subject and class, respectively
+* const_weight: a weight to control constrastive loss
+* num_folds: the number of folds for k-fold cross-validation
+* early_stop: the number of epochs for early stopping
+* monitor: the criterian for early stopping. The first word is 'min' or 'max', the second one is metric.
 ```
