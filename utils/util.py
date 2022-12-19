@@ -48,58 +48,6 @@ def load_edf_folds(np_data_path, n_folds, idx):
     np.random.seed(SEED)
     
     files = sorted(glob(os.path.join(np_data_path, "*.npz")))
-    
-    files_dict = dict()
-    for i in files:
-        file_name = os.path.split(i)[-1] 
-        file_num = file_name[3:5]
-        if file_num not in files_dict:
-            files_dict[file_num] = [i]
-        else:
-            files_dict[file_num].append(i)
-            
-    files_pairs = []
-    for i, key in enumerate(files_dict):
-        files_pairs.append(files_dict[key])
-    np.random.shuffle(files_pairs)
-    splited_files = np.array_split(files_pairs, n_folds)
-    all_files = sum(files_pairs, [])  
-    
-    folds_data = {}
-    for fold_id in range(n_folds):
-        test_file = sum(splited_files[fold_id].tolist(),[])
-        if '20' in np_data_path:
-            n_valid = 4        
-        else:
-            n_valid = 1
-            
-        if fold_id+n_valid < n_folds:
-            valid_list = splited_files[fold_id+1:fold_id+n_valid+1]
-        else: 
-            valid_1 = splited_files[fold_id+1:]
-            valid_2 = splited_files[:n_valid-len(valid_1)]
-            valid_list = valid_1+valid_2
-            
-        valid_file = sum([sum(sublist.tolist(),[]) for sublist in valid_list], [])
-                      
-        train_files = list(set(all_files) - set(test_file) - set(valid_file))
-        folds_data[fold_id] = {'train': train_files, 
-                               'valid': valid_file, 
-                               'test': test_file}
-            
-    train = folds_data[idx]['train']
-    valid = folds_data[idx]['valid']
-    test = folds_data[idx]['test']
-    all_ = np.concatenate((train,valid,test))
-    print('\n n data:',len(np.unique(all_)), 'n train:', len(train), 'n valid:', len(valid),'n test:', len(test))
-
-    return folds_data
-
-
-def load_edf_folds_proposed_method(np_data_path, n_folds, idx):
-    np.random.seed(SEED)
-    
-    files = sorted(glob(os.path.join(np_data_path, "*.npz")))
 
     files_dict = dict()
     for i in files:
@@ -190,6 +138,79 @@ def load_folds_semi_spervised(n_folds, idx):
         file_num = file_name[3:5]
         if file_num not in files_dict:
             train_edf_78.append(i)
+
+    folds_data = {}
+    for fold_id in range(n_folds):
+        test_file = sum(splited_files[fold_id].tolist(),[])
+        
+        if fold_id+n_valid < n_folds:   
+            valid_list = splited_files[fold_id+1:fold_id+1+n_valid]
+        else: 
+            valid_1 = splited_files[fold_id+1:]
+            valid_2 = splited_files[:n_valid-len(valid_1)]
+            valid_list = valid_1+valid_2
+        
+        valid_file = [sum(sublist.tolist(), []) for sublist in valid_list]
+        valid_file = sum(valid_file,[])
+        
+        train_edf_20 = list(set(edf_20_files) - set(valid_file) -set(test_file))
+                
+        folds_data[fold_id] = {'train_sup': train_edf_20, 
+                               'train_unsup': train_edf_78,
+                               'valid': valid_file, 
+                               'test': test_file}
+    
+    train_sup = folds_data[idx]['train_sup']
+    train_unsup = folds_data[idx]['train_unsup']
+    valid = folds_data[idx]['valid']
+    test = folds_data[idx]['test']
+
+    all_ = np.concatenate((train_sup,train_unsup,valid,test))
+    print('\n n data:',len(np.unique(all_)), 'sum:', len(train_sup)+len(train_unsup)+len(valid)+len(test), 
+          'n_train_sup:', len(train_sup), ' n_train_unsup:', len(train_unsup), ' n valid:', len(valid),' n test:', len(test))
+
+    return folds_data
+
+
+def load_folds_semi_spervised_reduced(n_folds, idx, unsupervised_domain_n=3):
+    np.random.seed(SEED)
+    
+    edf_20_files = sorted(glob(os.path.join('data_npz/edf_20_fpzcz', "*.npz")))
+    edf_78_files = sorted(glob(os.path.join('data_npz/edf_78_fpzcz', "*.npz")))
+    
+    n_valid = 4
+
+    files_dict = dict()
+    for i in edf_20_files:
+        file_name = os.path.split(i)[-1] 
+        file_num = file_name[3:5]
+        if file_num not in files_dict:
+            files_dict[file_num] = [i]
+        else:
+            files_dict[file_num].append(i)
+    
+    files_pairs = []
+    for i, key in enumerate(files_dict):
+        files_pairs.append(files_dict[key])
+    np.random.shuffle(files_pairs)
+    splited_files = np.array_split(files_pairs, n_folds)
+    
+    edf_78_files_dict = dict()
+    for i in edf_78_files:
+        file_name = os.path.split(i)[-1] 
+        file_num = file_name[3:5]
+        if file_num not in files_dict:
+            if file_num not in edf_78_files_dict:
+                edf_78_files_dict[file_num] = [i]
+            else:
+                edf_78_files_dict[file_num].append(i)
+
+    edf_78_files_pairs = []
+    for i, key in enumerate(edf_78_files_dict):
+        edf_78_files_pairs.append(edf_78_files_dict[key])
+        if i == unsupervised_domain_n-1:
+            break
+    train_edf_78 = sum(edf_78_files_pairs, [])
 
     folds_data = {}
     for fold_id in range(n_folds):
