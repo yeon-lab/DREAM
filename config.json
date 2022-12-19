@@ -11,7 +11,7 @@
         "zd_dim": 64,
         "zy_dim": 256,
         "dim_feedforward":128,
-        "n_layers": 3
+        "n_layers": 4,
         "aux_loss_y": 3500,
         "aux_loss_d": 10500,
         "beta_d": 1,
