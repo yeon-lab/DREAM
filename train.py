@@ -2,13 +2,13 @@ import argparse
 import collections
 import numpy as np
 
-from data_loader.data_loader_proposed_method import *
+from data_loader.data_loader import *
 import model.loss as module_loss
 import model.metric as module_metric
 from parse_config import ConfigParser
-from trainer.trainer_proposed_method import Trainer
+from trainer.trainer import Trainer
 from utils.util import *
-from model.nn_Proposed_method import *
+from model.model import *
 
 import torch
 import torch.nn as nn
@@ -20,7 +20,6 @@ SEED = 1111
 torch.manual_seed(SEED)
 torch.backends.cudnn.deterministic = False
 torch.backends.cudnn.benchmark = False
-
 
 
 def main(config, fold_id, data_config):
@@ -56,13 +55,12 @@ def main(config, fold_id, data_config):
     
     num_channels = [params['hidden_dim']]* params['levels']
     
-    feature_net = DIVA(params['zd_dim'] , params['zy_dim'], n_domains, config, data_config['d_type']) 
+    feature_net = VAE(params['zd_dim'] , params['zy_dim'], n_domains, config, data_config['d_type']) 
     classifier = TCN(input_size=params['zy_dim'], num_channels=num_channels, config=config) 
 
     logger.info(feature_net)
     logger.info(classifier)
     logger.info("-"*100)
-
 
     # get function handles of loss and metrics
     criterion = getattr(module_loss, config['loss'])
