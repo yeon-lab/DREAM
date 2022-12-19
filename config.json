@@ -1,8 +1,8 @@
 {
-    "name": "Proposed_method_shhs",
+    "name": "DREAM_shhs",
     "n_gpu": 1,
     "arch": {
-        "type": "Proposed_method",
+        "type": "DREAM",
         "args": {}
     },
     "hyper_params": {
@@ -20,8 +20,7 @@
         "beta_d": 1,
         "beta_x": 1,
         "beta_y": 1,
-        "const_weight": 2000,
-        "retraining_featurenet": false
+        "const_weight": 2000
     },
     "data_loader": {
         "args": {
