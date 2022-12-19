@@ -12,6 +12,8 @@ In this paper, we propose a neural network-based model named **DREAM** that lear
 
 ## DREAM
 ![Figure2_org](https://user-images.githubusercontent.com/39074545/208546254-11d0bcb9-a573-43ab-9ef6-6039760112bc.png)
+Overall architecture of **DREAM**
+
 
 
 ## Train and Test
