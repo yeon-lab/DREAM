@@ -20,8 +20,13 @@ Figure 1: Overall architecture of **DREAM**
 
 ## Usage
 
+### Training and test
+```python 
+python train.py --fold_id=0 --np_data_dir "data_npz/edf_20_fpzcz" --config "config.json"
+```
+
 ### Hyper-parameters
-Hyper-parameters are described in config.json
+Hyper-parameters are set in config.json
 ```python 
 {
     "name": "DREAM_shhs",
@@ -76,9 +81,4 @@ Hyper-parameters are described in config.json
         "early_stop": 5
     }
 }
-```
-
-### Training and test
-```python 
-python train.py --fold_id=0 --np_data_dir "data_npz/edf_20_fpzcz" --config "config.json"
 ```
