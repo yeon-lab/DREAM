@@ -302,8 +302,8 @@ class VAE(nn.Module):
         return x_recon, d_hat, y_hat, qzd, pzd, zd_q, qzx, pzx, zx_q, qzy, pzy, zy_q, zy_q_loc
 
     def get_losses(self, x, y, d):        
-        VAE_losses, conts_losses, CE_class, CE_domain = 0, 0, 0, 0
-        KL_domain, KL_class, reconst_losses = 0, 0, 0
+        VAE_losses, conts_losses = 0, 0
+
         
         d_target = d
         d_input = F.one_hot(d, num_classes= self.d_dim).float()
@@ -336,15 +336,9 @@ class VAE(nn.Module):
                + self.aux_loss_multiplier_d * CE_d \
                + self.aux_loss_multiplier_y * CE_y
             
-            CE_class += CE_y    
-            CE_domain += CE_d
-            reconst_losses += CE_x
             conts_losses += self.contrastive_loss(features, y_target)*self.const_weight
-            KL_domain += zd_p_minus_zd_q
-            KL_class += zy_p_minus_zy_q
    
-        all_losses = (VAE_losses+conts_losses)/self.seq_len
-        return all_losses, VAE_losses/self.seq_len, CE_class/self.seq_len, CE_domain/self.seq_len, conts_losses/self.seq_len, KL_domain/self.seq_len, KL_class/self.seq_len, reconst_losses/self.seq_len
+        return (VAE_losses+conts_losses)/self.seq_len
 
 
     def get_features(self, x):
