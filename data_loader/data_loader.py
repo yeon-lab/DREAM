@@ -25,8 +25,6 @@ class SleepDataLoader(Dataset):
             print('n domains:', self.n_domains)
         else:
             raise Exception("data length does not match")
-
-        
         
     def __len__(self):
         return len(self.epochs)
