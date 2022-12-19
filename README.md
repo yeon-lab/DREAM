@@ -6,7 +6,7 @@ Domain Invariant Representation Learning and Sleep Dynamics Modeling for Automat
 
 
 ## Framework
-<img width="432" alt="image" src="https://user-images.githubusercontent.com/39074545/208545003-e0652f3f-dcf5-49f3-bf24-ee4ae8fd2ace.png">
+![Figure2_org](https://user-images.githubusercontent.com/39074545/208546254-11d0bcb9-a573-43ab-9ef6-6039760112bc.png)
 
 
 ## Train and Test
