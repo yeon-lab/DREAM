@@ -381,19 +381,11 @@ class Transformer(nn.Module):
         self.hidden_dim = input_size
         self.batch_size = config["data_loader"]["args"]["batch_size"]
         self.dim_feedforward = config['hyper_params']['dim_feedforward']
-        self.is_CFR =  config['hyper_params']['is_CFR']
-        try:
-            self.n_layer = config['hyper_params']['n_layers']
-        except:
-            self.n_layer = n_layer
+        self.n_layer = config['hyper_params']['n_layers']
 
-        if self.is_CFR  is True:
-            self.mask = torch.ones((self.batch_size, config['hyper_params']['seq_len'])).byte().cuda()
-            self.crf = CRF(n_classes)
-        else: 
-            self.criterion = nn.CrossEntropyLoss()
-            self.softmax = nn.Softmax(dim=2) 
-            
+        self.mask = torch.ones((self.batch_size, config['hyper_params']['seq_len'])).byte().cuda()
+        self.crf = CRF(n_classes)
+
         self.encoder_layer = nn.TransformerEncoderLayer(d_model=self.hidden_dim, nhead=8, batch_first=True, dim_feedforward=self.dim_feedforward) 
         self.transformer_encoder = nn.TransformerEncoder(self.encoder_layer, num_layers=self.n_layer)
         self.fc = nn.Linear(self.hidden_dim, n_classes)
@@ -406,26 +398,15 @@ class Transformer(nn.Module):
         
     def get_loss(self, x, y): 
         x = self.forward(x)  # out: (N_batch, Length, Class)
-
-        if self.is_CFR is True:
-            mask = self.mask[:len(y)]
-            loss = self.crf.forward(x, y, mask)  # y: (batch_size, sequence_size), mask: (batch_size, sequence_size), out: (batch_size, sequence_size, num_labels)
-            loss = -loss.mean()
-        else:
-            x = self.softmax(x)  # (N_batch, Length, Class)
-            x = x.permute(0,2,1) # (N_batch, Class, L)
-            loss =  self.criterion(x, y) # input:(N, C, L), out:(N,L)
+        mask = self.mask[:len(y)]
+        loss = self.crf.forward(x, y, mask)  # y: (batch_size, sequence_size), mask: (batch_size, sequence_size), out: (batch_size, sequence_size, num_labels)
+        loss = -loss.mean()
             
         return loss
     
     def predict(self, x):
         x = self.forward(x) # out: (N_batch, Length, Class)
-        if self.is_CFR is True:
-            mask = self.mask[:len(x)]
-            x = self.crf.viterbi_decode(x, mask)
-        else:
-            x = self.softmax(x)  # (N_batch, Length, Class)
-            x = x.permute(0,2,1) # (N_batch, Class, L)
-            x = x.data.max(1)[1].cpu()
+        mask = self.mask[:len(x)]
+        x = self.crf.viterbi_decode(x, mask)
         return x
        
