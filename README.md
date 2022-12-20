@@ -16,6 +16,10 @@ In this paper, we propose a neural network-based model named **DREAM** that lear
 
 Figure 1: Overall architecture of **DREAM**
 
+## Installation
+
+DREAM depends on Numpy, scikit-learn, PyTorch (CUDA toolkit if use GPU), TorchCRF, and pytorch_metric_learning. You must have them installed before using DREAM.
+
 
 
 ## Usage
