@@ -28,7 +28,7 @@ python train.py --fold_id=0 --np_data_dir "data_npz/edf_20_fpzcz" --config "conf
 ### Hyper-parameters
 Hyper-parameters are set in config.json
 >
-* seq_len: Length of input sequence for classification network
+* `seq_len`: Length of input sequence for classification network
 * dim_feedforward: the dimension of the feedforward network model in Transformer encoder layer
 * n_layers: the number of encoder layers in Transformer
 * zd_dim and zy_dim: output dimensions of subject and class encoders, respectively
