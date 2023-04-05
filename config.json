@@ -42,7 +42,7 @@
     ],
     "trainer": {
         "epochs": 100,
-        "save_dir": "saved_transformer/",
+        "save_dir": "saved/",
         "save_period": 10,
         "verbosity": 2,
         "monitor": "max val_accuracy",
