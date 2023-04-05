@@ -26,15 +26,6 @@ def main(config, fold_id, data_config):
     logger.info('='*100)
     logger.info("fold id:{}".format(fold_id))
     logger.info('-'*100)
-    for key, value in config['hyper_params'].items():
-        logger.info('    {:25s}: {}'.format(str(key), value))
-    for key, value in config['data_loader']['args'].items():
-        logger.info('    {:25s}: {}'.format(str(key), value))
-    for key, value in config['optimizer']['args'].items():
-        logger.info('    {:25s}: {}'.format(str(key), value))
-    for key, value in config['trainer'].items():
-        logger.info('    {:25s}: {}'.format(str(key), value))
-    logger.info("-"*100)
     
     batch_size = config["data_loader"]["args"]["batch_size"]
     params = config['hyper_params']
@@ -45,7 +36,7 @@ def main(config, fold_id, data_config):
     valid_loader = DataLoader(dataset=valid_dataset, shuffle=True, batch_size = batch_size) 
     test_dataset = SleepDataLoader(config, folds_data[fold_id]['test'], d_type=data_config['d_type'], phase='test')
     test_loader = DataLoader(dataset=test_dataset, shuffle=True, batch_size = batch_size) 
-    logger.info("="*100)
+    logger.info("-"*100)
         
     weights_for_each_class = calc_class_weight(train_dataset.counts)
     n_domains = train_dataset.n_domains
