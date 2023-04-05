@@ -52,9 +52,6 @@ class BaseTrainer:
 
         self.checkpoint_dir = config.save_dir
 
-        if config.resume is not None:
-            self._resume_checkpoint(config.resume)
-
     @abstractmethod
     def _train_epoch(self, epoch, total_epochs):
         """
@@ -104,11 +101,11 @@ class BaseTrainer:
                 if not_improved_count > self.early_stop:
                     self.logger.info("Validation performance didn\'t improve for {} epochs. "
                                      "Training stops.".format(self.early_stop))
-                    self._save_checkpoint(epoch, finetune=False, save_best=True)
+                    self._save_checkpoint(epoch, finetune=False)
                     break
 
-            if epoch == self.epochs:
-                self._save_checkpoint(epoch, finetune=False, save_best=True)   
+            if epoch % self.save_period == 0 or epoch == self.epochs:
+                self._save_checkpoint(epoch, finetune=False)   
                 
         
         if self.do_test:      
@@ -172,11 +169,11 @@ class BaseTrainer:
                 if not_improved_count > self.early_stop:
                     self.logger.info("Validation performance didn\'t improve for {} epochs. "
                                      "Training stops.".format(self.early_stop))
-                    self._save_checkpoint(epoch, finetune=True, save_best=True)
+                    self._save_checkpoint(epoch, finetune=True)
                     break
 
-            if epoch == self.epochs:
-                self._save_checkpoint(epoch, finetune=True, save_best=True)   
+            if epoch % self.save_period == 0 or epoch == self.epochs:
+                self._save_checkpoint(epoch, finetune=True)   
                 
         
         if self.do_test:      
@@ -199,7 +196,7 @@ class BaseTrainer:
         list_ids = list(range(n_gpu_use))
         return device, list_ids
 
-    def _save_checkpoint(self, epoch, finetune=False, save_best=False):
+    def _save_checkpoint(self, epoch, finetune=False):
         state_dict = None
         
         if finetune is False:
@@ -231,31 +228,4 @@ class BaseTrainer:
         self.logger.info("Saving checkpoint: {} ...".format(filename))
             
 
-    def _resume_checkpoint(self, resume_path):
-        """
-        Resume from saved checkpoints
 
-        :param resume_path: Checkpoint path to be resumed
-        """
-        resume_path = str(resume_path)
-        self.logger.info("Loading checkpoint: {} ...".format(resume_path))
-        checkpoint = torch.load(resume_path)
-        self.start_epoch = checkpoint['epoch'] + 1
-        self.mnt_best = checkpoint['monitor_best']
-
-        # load architecture params from checkpoint.
-        if checkpoint['config']['arch'] != self.config['arch']:
-            self.logger.warning("Warning: Architecture configuration given in config file is different from that of "
-                                "checkpoint. This may yield an exception while state_dict is being loaded.")
-        self.model.load_state_dict(checkpoint['state_dict'])
-
-        # load optimizer state from checkpoint only when optimizer type is not changed.
-        if checkpoint['config']['optimizer']['type'] != self.config['optimizer']['type']:
-            self.logger.warning("Warning: Optimizer type given in config file is different from that of checkpoint. "
-                                "Optimizer parameters not being resumed.")
-        else:
-            self.optimizer.load_state_dict(checkpoint['optimizer'])
-
-        self.logger.info("Checkpoint loaded. Resume training from epoch {}".format(self.start_epoch))
-        
-        
