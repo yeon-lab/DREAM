@@ -26,29 +26,15 @@ class Trainer(BaseTrainer):
         self.lr_scheduler_c = classifier_optimizer
         self.log_step = int(supervised_loader.batch_size) * 1  # reduce this if you want more logs
 
-        self.train_metrics = MetricTracker('loss', *[m.__name__ for m in self.metric_ftns])
-        self.valid_metrics = MetricTracker('loss', *[m.__name__ for m in self.metric_ftns])
-        self.test_metrics = MetricTracker('loss', *[m.__name__ for m in self.metric_ftns])
+        self.metrics = MetricTracker('loss', *[m.__name__ for m in self.metric_ftns])
 
         self.class_weights = class_weights
         self.reduce_lr = reduce_lr
-        
-        self.loss_dict = {
-            'total_loss': [],
-            'DIVA_loss': [], 
-            'Recon_loss': [], 
-            'CE_domain': [], 
-            'CE_class': [], 
-            'KL_domain': [], 
-            'KL_class': [], 
-            'Conts_loss': [],
-            'CRF_loss': []
-        }
 
 
     def _train_feature_net(self, epoch):
         self.feature_net.train()
-        self.train_metrics.reset()
+        self.metrics.reset()
         
         self.feature_net.beta_d = min([self.config['hyper_params']['beta_d'], self.config['hyper_params']['beta_d'] * (epoch * 1.) / self.config['hyper_params']['warmup']])
         self.feature_net.beta_y = min([self.config['hyper_params']['beta_y'], self.config['hyper_params']['beta_y'] * (epoch * 1.) / self.config['hyper_params']['warmup']])
@@ -97,15 +83,6 @@ class Trainer(BaseTrainer):
                 preds_ = output.data.max(1, keepdim=True)[1].cpu()    
                 outs = np.append(outs, preds_.numpy())
                 trgs = np.append(trgs, y.data.cpu().numpy())
-                
-                self.loss_dict['total_loss'].append(all_loss.cpu().item())
-                self.loss_dict['DIVA_loss'].append(DIVA_loss.cpu().item())
-                self.loss_dict['Recon_loss'].append(Recon_loss.cpu().item())
-                self.loss_dict['CE_domain'].append(CE_domain.cpu().item())
-                self.loss_dict['CE_class'].append(CE_class.cpu().item())
-                self.loss_dict['KL_domain'].append(KL_domain.cpu().item())
-                self.loss_dict['KL_class'].append(KL_class.cpu().item())
-                self.loss_dict['Conts_loss'].append(Conts_loss.cpu().item())
 
             if iter_ % self.log_step == 0:
                 self.logger.debug('Train Epoch: {} {}  {} - Loss: {:.6f} ClassLoss: {:.6f} ContLoss: {:.6f}'.format(
@@ -119,9 +96,9 @@ class Trainer(BaseTrainer):
 
                             
         for met in self.metric_ftns:
-            self.train_metrics.update(met.__name__, met(outs.reshape(-1,1), trgs.reshape(-1,1)))
+            self.metrics.update(met.__name__, met(outs.reshape(-1,1), trgs.reshape(-1,1)))
             
-        log = self.train_metrics.result()
+        log = self.metrics.result()
 
 
         if self.do_validation:
@@ -141,7 +118,7 @@ class Trainer(BaseTrainer):
 
         """
         self.feature_net.eval()
-        self.valid_metrics.reset()
+        self.metrics.reset()
         
         with torch.no_grad():
             outs = np.array([])
@@ -152,16 +129,16 @@ class Trainer(BaseTrainer):
                 output = self.feature_net.predict(x)
                 loss = self.criterion(output, y, self.class_weights, self.device)
 
-                self.valid_metrics.update('loss', loss.item())
+                self.metrics.update('loss', loss.item())
                     
                 preds_ = output.data.max(1, keepdim=True)[1].cpu()
                 outs = np.append(outs, preds_.numpy())
                 trgs = np.append(trgs, y.data.cpu().numpy())
                 
             for met in self.metric_ftns:
-                self.valid_metrics.update(met.__name__, met(outs.reshape(-1,1), trgs.reshape(-1,1)))
+                self.metrics.update(met.__name__, met(outs.reshape(-1,1), trgs.reshape(-1,1)))
 
-        return self.valid_metrics.result()
+        return self.metrics.result()
     
     def _test_feature_net(self):
         """
@@ -173,7 +150,7 @@ class Trainer(BaseTrainer):
         
         val_log = self._valid_feature_net()
         
-        self.test_metrics.reset()
+        self.metrics.reset()
         with torch.no_grad():
             outs = np.array([])
             trgs = np.array([])
@@ -183,7 +160,7 @@ class Trainer(BaseTrainer):
                 output = self.feature_net.predict(x)
                 loss = self.criterion(output, y, self.class_weights, self.device)
 
-                self.test_metrics.update('loss', loss.item())
+                self.metrics.update('loss', loss.item())
                     
                 preds_ = output.data.max(1, keepdim=True)[1].cpu()
                 outs = np.append(outs, preds_.numpy())
@@ -191,8 +168,8 @@ class Trainer(BaseTrainer):
             
         
         for met in self.metric_ftns:
-            self.test_metrics.update(met.__name__, met(outs.reshape(-1,1), trgs.reshape(-1,1)))
-        test_log = self.test_metrics.result()
+            self.metrics.update(met.__name__, met(outs.reshape(-1,1), trgs.reshape(-1,1)))
+        test_log = self.metrics.result()
         
         log = {}
         log.update(**{'val_' + k: v for k, v in val_log.items()})
@@ -214,7 +191,7 @@ class Trainer(BaseTrainer):
             self.feature_net.train()
         
         self.classifier.train()
-        self.train_metrics.reset()
+        self.metrics.reset()
 
         outs = np.array([])
         trgs = np.array([])
@@ -237,7 +214,7 @@ class Trainer(BaseTrainer):
                 loss.backward(retain_graph=True)
                 self.featurenet_optimizer.step()
                 
-            self.train_metrics.update('loss', loss.item())
+            self.metrics.update('loss', loss.item())
                 
             preds_ = np.array(output)   
             outs = np.append(outs, preds_)
@@ -254,13 +231,11 @@ class Trainer(BaseTrainer):
                     
                 ))
                 
-            self.loss_dict['CRF_loss'].append(loss.cpu().item())
-
                             
         for met in self.metric_ftns:
-            self.train_metrics.update(met.__name__, met(outs.reshape(-1,1), trgs.reshape(-1,1)))
+            self.metrics.update(met.__name__, met(outs.reshape(-1,1), trgs.reshape(-1,1)))
             
-        log = self.train_metrics.result()
+        log = self.metrics.result()
         
         if self.do_validation:
             val_log = self._valid_classifier()
@@ -277,7 +252,7 @@ class Trainer(BaseTrainer):
         
         self.feature_net.eval()
         self.classifier.eval()
-        self.valid_metrics.reset()
+        self.metrics.reset()
         
         with torch.no_grad():
             outs = np.array([])
@@ -290,16 +265,16 @@ class Trainer(BaseTrainer):
                 loss = self.classifier.get_loss(features, y)
                 output = self.classifier.predict(features)
 
-                self.valid_metrics.update('loss', loss.item())
+                self.metrics.update('loss', loss.item())
                     
                 preds_ = np.array(output) 
                 outs = np.append(outs, preds_)
                 trgs = np.append(trgs, y.data.cpu().numpy())
                 
             for met in self.metric_ftns:
-                self.valid_metrics.update(met.__name__, met(outs.reshape(-1,1), trgs.reshape(-1,1)))
+                self.metrics.update(met.__name__, met(outs.reshape(-1,1), trgs.reshape(-1,1)))
 
-        return self.valid_metrics.result()
+        return self.metrics.result()
     
     def _test_classifier(self):
         if self.config['hyper_params']['retraining_featurenet']:
@@ -315,7 +290,7 @@ class Trainer(BaseTrainer):
         
         val_log = self._valid_classifier()
         
-        self.test_metrics.reset()
+        self.metrics.reset()
         with torch.no_grad():
             outs = np.array([])
             trgs = np.array([])
@@ -326,7 +301,7 @@ class Trainer(BaseTrainer):
                 loss = self.classifier.get_loss(features, y)
                 output = self.classifier.predict(features)
 
-                self.test_metrics.update('loss', loss.item())
+                self.metrics.update('loss', loss.item())
                     
                 preds_ = np.array(output) 
                 outs = np.append(outs, preds_)
@@ -341,8 +316,8 @@ class Trainer(BaseTrainer):
         np.save(self.checkpoint_dir / losses_name, self.loss_dict)
         
         for met in self.metric_ftns:
-            self.test_metrics.update(met.__name__, met(outs.reshape(-1,1), trgs.reshape(-1,1)))
-        test_log = self.test_metrics.result()
+            self.metrics.update(met.__name__, met(outs.reshape(-1,1), trgs.reshape(-1,1)))
+        test_log = self.metrics.result()
         
         log = {}
         log.update(**{'val_' + k: v for k, v in val_log.items()})
