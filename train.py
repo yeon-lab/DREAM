@@ -88,8 +88,6 @@ if __name__ == '__main__':
     args = argparse.ArgumentParser(description='PyTorch Template')
     args.add_argument('-c', '--config', type=str,
                       help='config file path (default: None)')
-    args.add_argument('-r', '--resume', default=None, type=str,
-                      help='path to latest checkpoint (default: None)')
     args.add_argument('-d', '--device', default="0", type=str,
                       help='indices of GPUs to enable (default: all)')
     args.add_argument('-f', '--fold_id', type=str,
