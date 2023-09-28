@@ -1,17 +1,6 @@
 import torch
 import torch.nn as nn
 from torch.nn import functional as F
-from pytorch_metric_learning import losses
-
-##### SupervisedContrastiveLoss
-class SupervisedContrastiveLoss(nn.Module):
-    def __init__(self):
-        super(SupervisedContrastiveLoss, self).__init__()
-        self.tau = 0.07
-    def forward(self, feature_vectors, labels):
-        # Normalize feature vectors
-        logits = F.normalize(feature_vectors, p=2, dim=1)             
-        return losses.NTXentLoss(temperature=self.tau)(logits, torch.squeeze(labels))
 
 def conv3(in_planes, out_planes, stride=1):
     return nn.Conv1d(in_planes, out_planes, kernel_size=3, stride=stride, padding=1, bias=False)
@@ -207,3 +196,45 @@ class aux_layer(nn.Module):
         h = F.relu(x)
         loc = self.fc(h)
         return loc
+
+
+class Transform:
+    def __init__(self, sampling_rate=100):
+        self.size = sampling_rate*30
+        
+    def permute(self,signal, pieces):
+        """
+        signal: numpy array (batch x window)
+        pieces: number of segments along time
+        """
+        signal = signal.cpu().numpy()
+        signal = signal.T
+        pieces = int(np.ceil(np.shape(signal)[0] / (np.shape(signal)[0] // pieces)).tolist()) 
+        piece_length = int(np.shape(signal)[0] // pieces)
+        sequence = list(range(0, pieces))
+        np.random.shuffle(sequence)
+
+        permuted_signal = np.reshape(signal[:(np.shape(signal)[0] // pieces * pieces)],
+                                     (pieces, piece_length,-1)).tolist()
+
+        tail = signal[(np.shape(signal)[0] // pieces * pieces):]
+        permuted_signal = np.asarray(permuted_signal)[sequence]
+        permuted_signal = np.concatenate(permuted_signal, axis=0)
+        permuted_signal = np.concatenate((permuted_signal,tail[:,0]), axis=0)
+        permuted_signal = permuted_signal[:,None]
+        permuted_signal = permuted_signal.T
+        return permuted_signal
+    
+    def crop_resize(self, signal, size):
+        signal = signal.cpu().numpy()
+        signal = signal.T
+        signal_shape = signal.shape
+        size = signal.shape[0] * size
+        size = int(size)
+        start = random.randint(0, signal.shape[0]-size)
+        crop_signal = signal[start:start + size,:]
+
+        crop_signal = cv2.resize(crop_signal, (1, self.size), interpolation=cv2.INTER_LINEAR)
+
+        crop_signal = crop_signal.T
+        return crop_signal
