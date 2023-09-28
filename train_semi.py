@@ -5,7 +5,7 @@ import numpy as np
 from data_loader.data_loader_semi import *
 import model.loss as module_loss
 import model.metric as module_metric
-from parse_config import ConfigParser
+from utils.parse_config import ConfigParser
 from trainer.trainer_semi import Trainer
 from utils.util import *
 from model.DREAM_semi import *
