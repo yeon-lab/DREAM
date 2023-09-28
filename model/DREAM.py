@@ -3,7 +3,9 @@ import torch.nn as nn
 from torch.nn import functional as F
 import torch.distributions as dist
 from TorchCRF import CRF
-from model.base import SupervisedContrastiveLoss, Decoder_ResNet, Encoder_ResNet, p_decoder, aux_layer
+from model.base import Decoder_ResNet, Encoder_ResNet, p_decoder, aux_layer
+from model.loss import SupervisedContrastiveLoss, Self_SupervisedContrastiveLoss
+
 SEED = 1111
 torch.manual_seed(SEED)
 torch.backends.cudnn.deterministic = False
