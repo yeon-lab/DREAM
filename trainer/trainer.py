@@ -15,7 +15,6 @@ class Trainer(BaseTrainer):
         super().__init__(feature_net, classifier, featurenet_optimizer, classifier_optimizer, 
                          criterion, metric_ftns, config, fold_id)
         self.data_loader = data_loader
-        self.len_epoch = len(self.data_loader)
 
         self.valid_loader = valid_loader
         self.do_validation = self.valid_loader is not None
@@ -33,16 +32,11 @@ class Trainer(BaseTrainer):
     def _train_feature_net(self, epoch):
         self.feature_net.train()
         self.metrics.reset()
-        try:
-            self.feature_net.beta_d = min([self.config['hyper_params']['beta_d'], self.config['hyper_params']['beta_d'] * (epoch * 1.) / self.config['hyper_params']['warmup']])
-            self.feature_net.beta_y = min([self.config['hyper_params']['beta_y'], self.config['hyper_params']['beta_y'] * (epoch * 1.) / self.config['hyper_params']['warmup']])
-            print('beta d:', self.feature_net.beta_d)
-            print('beta y:', self.feature_net.beta_y)
-        except:
-            pass
+        
+        self.feature_net.beta_d = min([self.config['hyper_params']['beta_d'], self.config['hyper_params']['beta_d'] * (epoch * 1.) / self.config['hyper_params']['warmup']])
+        self.feature_net.beta_y = min([self.config['hyper_params']['beta_y'], self.config['hyper_params']['beta_y'] * (epoch * 1.) / self.config['hyper_params']['warmup']])
 
-        outs = np.array([])
-        trgs = np.array([])
+        outs = np.array([]), trgs = np.array([])
         for batch_idx, (x, y, d) in enumerate(self.data_loader):
             x, y, d = x.to(self.device), y.to(self.device), d.to(self.device)
             self.featurenet_optimizer.zero_grad()
@@ -62,22 +56,16 @@ class Trainer(BaseTrainer):
                     loss.item(),
                     Conts_loss.item()
                 ))
-                
             preds_ = output.data.max(1, keepdim=True)[1].cpu()    
             outs = np.append(outs, preds_.numpy())
             trgs = np.append(trgs, y.data.cpu().numpy())
-
-
-            if batch_idx == self.len_epoch:
-                break
                             
         for met in self.metric_ftns:
-            self.metrics.update(met.__name__, met(outs.reshape(-1,1), trgs.reshape(-1,1)))
-            
+            self.metrics.update(met.__name__, met(outs.reshape(-1,1), trgs.reshape(-1,1)))      
         log = self.metrics.result()
 
         if self.do_validation:
-            val_log = self._valid_feature_net()
+            val_log = self._infer_feature_net(self.valid_loader)
             log.update(**{'val_' + k: v for k, v in val_log.items()})
 
             # THIS part is to reduce the learning rate after 10 epochs to 1e-4
@@ -87,20 +75,15 @@ class Trainer(BaseTrainer):
 
         return log
 
-    def _valid_feature_net(self):
-        """
-        Validate after training an epoch
-
-        """
+    def _infer_feature_net(self, dataset):
         self.feature_net.eval()
         self.metrics.reset()
         
         with torch.no_grad():
             outs = np.array([])
             trgs = np.array([])
-            for batch_idx, (x, y, _) in enumerate(self.valid_loader):
+            for batch_idx, (x, y, _) in enumerate(dataset):
                 x, y = x.to(self.device), y.to(self.device)
-
                 output = self.feature_net.predict(x)
                 loss = self.criterion(output, y, self.class_weights, self.device)
                 self.metrics.update('loss', loss.item())
@@ -115,33 +98,10 @@ class Trainer(BaseTrainer):
         return self.metrics.result()
     
     def _test_feature_net(self):
-        """
-        test logic
-        """
         PATH = str(self.checkpoint_dir / 'featurenet_best.pth')
-        self.feature_net.load_state_dict(torch.load(PATH)['state_dict'])
-        self.feature_net.eval()
-        
-        val_log = self._valid_feature_net()
-        
-        self.metrics.reset()
-        with torch.no_grad():
-            outs = np.array([])
-            trgs = np.array([])
-            for batch_idx, (x, y, _) in enumerate(self.test_loader):
-                x, y = x.to(self.device), y.to(self.device)
-
-                output = self.feature_net.predict(x)
-                loss = self.criterion(output, y, self.class_weights, self.device)
-                self.metrics.update('loss', loss.item())
-                    
-                preds_ = output.data.max(1, keepdim=True)[1].cpu()
-                outs = np.append(outs, preds_.numpy())
-                trgs = np.append(trgs, y.data.cpu().numpy())
-        
-        for met in self.metric_ftns:
-            self.metrics.update(met.__name__, met(outs.reshape(-1,1), trgs.reshape(-1,1)))
-        test_log = self.test_metrics.result()
+        self.feature_net.load_state_dict(torch.load(PATH)['state_dict'])        
+        val_log = self._infer_feature_net(self.valid_loader)
+        test_log = self._infer_feature_net(self.test_loader)
         
         log = {}
         log.update(**{'val_' + k: v for k, v in val_log.items()})
@@ -156,7 +116,6 @@ class Trainer(BaseTrainer):
             
 ##################### Finetuning            
 ##########################################
-
     def _train_classifier(self, epoch):
         PATH_f = str(self.checkpoint_dir / 'featurenet_best.pth')
         self.feature_net.load_state_dict(torch.load(PATH_f)['state_dict'])
@@ -165,17 +124,13 @@ class Trainer(BaseTrainer):
         self.classifier.train()
         self.metrics.reset()
 
-        outs = np.array([])
-        trgs = np.array([])
+        outs, trgs = np.array([]), np.array([])
         for batch_idx, (x, y, _) in enumerate(self.data_loader):
             x, y = x.to(self.device), y.to(self.device)
-
             self.classifier_optimizer.zero_grad()
-            
             features = self.feature_net.get_features(x)
             loss = self.classifier.get_loss(features, y)
             output = self.classifier.predict(features)
-            
             loss.backward()
             self.classifier_optimizer.step()
                 
@@ -184,7 +139,6 @@ class Trainer(BaseTrainer):
             preds_ = np.array(output)   
             outs = np.append(outs, preds_)
             trgs = np.append(trgs, y.data.cpu().numpy())
-            
             accuracy = accuracy_score(y.data.cpu().numpy().reshape(-1,1), preds_.reshape(-1,1))
             
             if batch_idx % self.log_step == 0:
@@ -195,16 +149,13 @@ class Trainer(BaseTrainer):
                     accuracy
                 ))
                 
-            if batch_idx == self.len_epoch:
-                break
                             
         for met in self.metric_ftns:
             self.metrics.update(met.__name__, met(outs.reshape(-1,1), trgs.reshape(-1,1)))
-            
         log = self.metrics.result()
         
         if self.do_validation:
-            val_log = self._valid_classifier()
+            val_log = self._infer_classifier(self.valid_loader)
             log.update(**{'val_' + k: v for k, v in val_log.items()})
 
             # THIS part is to reduce the learning rate after 10 epochs to 1e-4
@@ -213,19 +164,16 @@ class Trainer(BaseTrainer):
                     g['lr'] = 0.0001
         return log
 
-    def _valid_classifier(self):
+    def _infer_classifier(self, dataset, is_test=False):
         self.feature_net.eval()
         self.classifier.eval()
         self.metrics.reset()
         
         with torch.no_grad():
-            outs = np.array([])
-            trgs = np.array([])
-            for batch_idx, (x, y, _) in enumerate(self.valid_loader):
-                x, y = x.to(self.device), y.to(self.device)
-                
+            outs, trgs = np.array([]), np.array([])
+            for batch_idx, (x, y, _) in enumerate(dataset):
+                x, y = x.to(self.device), y.to(self.device)                
                 features = self.feature_net.get_features(x)
-                
                 loss = self.classifier.get_loss(features, y)
                 output = self.classifier.predict(features)
 
@@ -234,7 +182,13 @@ class Trainer(BaseTrainer):
                 preds_ = np.array(output) 
                 outs = np.append(outs, preds_)
                 trgs = np.append(trgs, y.data.cpu().numpy())
-                
+
+            if is_test:
+                outs_name = "test_outs_" + str(self.fold_id)
+                trgs_name = "test_trgs_" + str(self.fold_id)
+                np.save(self.checkpoint_dir / outs_name, outs)
+                np.save(self.checkpoint_dir / trgs_name, trgs)   
+
             for met in self.metric_ftns:
                 self.metrics.update(met.__name__, met(outs.reshape(-1,1), trgs.reshape(-1,1)))
 
@@ -244,36 +198,10 @@ class Trainer(BaseTrainer):
         self.feature_net.eval()
         PATH_c = str(self.checkpoint_dir / 'classifier_best.pth')
         self.classifier.load_state_dict(torch.load(PATH_c)['state_dict'])
-        self.classifier.eval()
         
-        val_log = self._valid_classifier()
-        
-        self.metrics.reset()
-        with torch.no_grad():
-            outs = np.array([])
-            trgs = np.array([])
-            for batch_idx, (x, y, _) in enumerate(self.test_loader):
-                x, y = x.to(self.device), y.to(self.device)
-                features = self.feature_net.get_features(x)
+        val_log = self._infer_classifier(self.valid_loader)
+        test_log = self._infer_classifier(self.test_loader, is_test=True)
 
-                loss = self.classifier.get_loss(features, y)
-                output = self.classifier.predict(features)
-
-                self.metrics.update('loss', loss.item())
-                    
-                preds_ = np.array(output) 
-                outs = np.append(outs, preds_)
-                trgs = np.append(trgs, y.data.cpu().numpy())
-            
-        outs_name = "test_outs_" + str(self.fold_id)
-        trgs_name = "test_trgs_" + str(self.fold_id)
-        np.save(self.checkpoint_dir / outs_name, outs)
-        np.save(self.checkpoint_dir / trgs_name, trgs)   
-        
-        for met in self.metric_ftns:
-            self.metrics.update(met.__name__, met(outs.reshape(-1,1), trgs.reshape(-1,1)))
-        test_log = self.metrics.result()
-        
         log = {}
         log.update(**{'val_' + k: v for k, v in val_log.items()})
         log.update(**{'test_' + k: v for k, v in test_log.items()})
@@ -282,7 +210,8 @@ class Trainer(BaseTrainer):
         self.logger.info('Finetuning is completed')
         self.logger.info('-'*100)
         for key, value in log.items():
-            self.logger.info('    {:15s}: {}'.format(str(key), value))            
+            self.logger.info('    {:15s}: {}'.format(str(key), value))      
+          
             
     def _progress(self, batch_idx):
         base = '[{}/{} ({:.0f}%)]'
