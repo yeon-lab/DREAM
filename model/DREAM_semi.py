@@ -6,8 +6,6 @@ import random
 from TorchCRF import CRF
 
 import torch
-import math
-import cv2
 from model.base import Decoder_ResNet, Encoder_ResNet, p_decoder, aux_layer
 from model.loss import SupervisedContrastiveLoss, Self_SupervisedContrastiveLoss
 SEED = 1111
@@ -275,7 +273,6 @@ class Transformer(nn.Module):
         
     def get_loss(self, x, y): 
         x = self.forward(x)  # out: (N_batch, Length, Class)
-
         if self.is_CFR is True:
             mask = self.mask[:len(y)]
             loss = self.crf.forward(x, y, mask)  # y: (batch_size, sequence_size), mask: (batch_size, sequence_size), out: (batch_size, sequence_size, num_labels)
