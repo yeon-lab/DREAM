@@ -11,15 +11,12 @@ class Trainer(BaseTrainer):
     """
     def __init__(self, feature_net, classifier, featurenet_optimizer, classifier_optimizer, 
                  criterion, metric_ftns, config, data_loader, fold_id, 
-                 valid_loader=None, test_loader=None, class_weights=None, reduce_lr=False):
+                 valid_loader=None, test_loader=None, class_weights=None):
         super().__init__(feature_net, classifier, featurenet_optimizer, classifier_optimizer, 
                          criterion, metric_ftns, config, fold_id)
         self.data_loader = data_loader
-
         self.valid_loader = valid_loader
-        self.do_validation = self.valid_loader is not None
         self.test_loader = test_loader
-        self.do_test = self.test_loader is not None
         self.lr_scheduler_f = featurenet_optimizer
         self.lr_scheduler_c = classifier_optimizer
         self.log_step = int(data_loader.batch_size) * 1  # reduce this if you want more logs
@@ -27,7 +24,7 @@ class Trainer(BaseTrainer):
         self.metrics = MetricTracker('loss', *[m.__name__ for m in self.metric_ftns])
 
         self.class_weights = class_weights
-        self.reduce_lr = reduce_lr
+        self.reduce_lr = self.config['hyper_params']['reduce_lr']
         
     def _train_feature_net(self, epoch):
         self.feature_net.train()
@@ -64,15 +61,13 @@ class Trainer(BaseTrainer):
             self.metrics.update(met.__name__, met(outs.reshape(-1,1), trgs.reshape(-1,1)))      
         log = self.metrics.result()
 
-        if self.do_validation:
-            val_log = self._infer_feature_net(self.valid_loader)
-            log.update(**{'val_' + k: v for k, v in val_log.items()})
+        val_log = self._infer_feature_net(self.valid_loader)
+        log.update(**{'val_' + k: v for k, v in val_log.items()})
 
-            # THIS part is to reduce the learning rate after 10 epochs to 1e-4
-            if self.reduce_lr and epoch == 10:
-                for g in self.lr_scheduler_f.param_groups:
-                    g['lr'] = 0.0001
-
+        # THIS part is to reduce the learning rate after 10 epochs to 1e-4
+        if self.reduce_lr and epoch == 10:
+            for g in self.lr_scheduler_f.param_groups:
+                g['lr'] = 0.0001
         return log
 
     def _infer_feature_net(self, dataset):
@@ -154,14 +149,13 @@ class Trainer(BaseTrainer):
             self.metrics.update(met.__name__, met(outs.reshape(-1,1), trgs.reshape(-1,1)))
         log = self.metrics.result()
         
-        if self.do_validation:
-            val_log = self._infer_classifier(self.valid_loader)
-            log.update(**{'val_' + k: v for k, v in val_log.items()})
+        val_log = self._infer_classifier(self.valid_loader)
+        log.update(**{'val_' + k: v for k, v in val_log.items()})
 
-            # THIS part is to reduce the learning rate after 10 epochs to 1e-4
-            if self.reduce_lr and epoch == 10:
-                for g in self.lr_scheduler_c.param_groups:
-                    g['lr'] = 0.0001
+        # THIS part is to reduce the learning rate after 10 epochs to 1e-4
+        if self.reduce_lr and epoch == 10:
+            for g in self.lr_scheduler_c.param_groups:
+                g['lr'] = 0.0001
         return log
 
     def _infer_classifier(self, dataset, is_test=False):
