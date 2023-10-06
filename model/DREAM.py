@@ -96,9 +96,9 @@ class VAE(nn.Module):
             y_input = F.one_hot(y_target, num_classes= self.y_dim).float() 
             if self.augment:
                 x_croped = self.augmentor.crop_resize(x_sample,random.uniform(0.25,0.75))
-                x_croped  = torch.FloatTensor(x_croped).cuda()
+                x_croped  = torch.FloatTensor(x_croped).to(y.device)
                 x_permuted = self.augmentor.permute(x_sample,random.randint(5,20))
-                x_permuted  = torch.FloatTensor(x_permuted).cuda()
+                x_permuted  = torch.FloatTensor(x_permuted).to(y.device)
                 x_set = [x_croped, x_permuted]
             else:
                 x_set = [x_sample]
