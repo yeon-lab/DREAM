@@ -11,7 +11,7 @@ torch.manual_seed(SEED)
 torch.backends.cudnn.deterministic = False
 torch.backends.cudnn.benchmark = False
 class VAE(nn.Module):
-    def __init__(self, zd_dim, zy_dim, n_domains, config, d_type):
+    def __init__(self, zd_dim, zy_dim, n_domains, config, sampling_rate):
         super(VAE, self).__init__()
         self.zd_dim = zd_dim
         self.zx_dim = 0
@@ -20,11 +20,7 @@ class VAE(nn.Module):
         params = config['hyper_params']
         self.y_dim = params['num_classes']
         self.seq_len = params['seq_len']
-        
-        if d_type == 'edf':
-            self.sampling_rate = 100
-        elif d_type == 'shhs':
-            self.sampling_rate = 125
+        self.sampling_rate = sampling_rate
             
         self.contrastive_loss = SupervisedContrastiveLoss()
             
