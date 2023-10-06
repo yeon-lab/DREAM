@@ -23,7 +23,7 @@ class VAE(nn.Module):
         self.contrastive_loss = SupervisedContrastiveLoss()
         self.augment = augment
         if self.augment:
-            self.augmentor = Augmentation(sampling_rate=sampling_rate)
+            self.augmentor = Augmentation(sampling_rate)
             
         self.px = Decoder_ResNet(self.zd_dim, self.zx_dim, self.zy_dim, self.sampling_rate)
         self.pzd = p_decoder(self.d_dim, self.zd_dim)
