@@ -202,7 +202,7 @@ class aux_layer(nn.Module):
 
 
 class Transform:
-    def __init__(self, sampling_rate=100):
+    def __init__(self, sampling_rate):
         self.size = sampling_rate*30
         
     def permute(self,signal, pieces):
