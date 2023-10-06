@@ -68,8 +68,8 @@ class VAE(nn.Module):
         x_recon = self.px(zx=zx_q, zy=zy_q, zd=zd_q)
         zd_p_loc, zd_p_scale = self.pzd(d)
         if self.zx_dim != 0:
-            zx_p_loc, zx_p_scale = torch.zeros(zd_p_loc.size()[0], self.zx_dim).cuda(),\
-                                   torch.ones(zd_p_loc.size()[0], self.zx_dim).cuda()
+            zx_p_loc, zx_p_scale = torch.zeros(zd_p_loc.size()[0], self.zx_dim).to(y.device),\
+                                   torch.ones(zd_p_loc.size()[0], self.zx_dim).to(y.device)
         zy_p_loc, zy_p_scale = self.pzy(y)
 
         # Reparameterization trick
