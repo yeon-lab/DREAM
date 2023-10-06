@@ -11,7 +11,6 @@ from utils.util import *
 from model.DREAM import *
 
 import torch
-import torch.nn as nn
 from torch.utils.data import DataLoader
 
 
@@ -23,9 +22,6 @@ torch.backends.cudnn.benchmark = False
 
 def main(config, fold_id, sampling_rate):
     logger = config.get_logger('train') 
-    logger.info('='*100)
-    logger.info("fold id:{}".format(fold_id))
-    logger.info('-'*100)
     
     batch_size = config["data_loader"]["args"]["batch_size"]
     params = config['hyper_params']
@@ -43,13 +39,8 @@ def main(config, fold_id, sampling_rate):
     
     # build model architecture, initialize weights, then print to console  
    
-    feature_net = VAE(params['zd_dim'] , params['zy_dim'], n_domains, config, sampling_rate) 
+    feature_net = VAE(params['zd_dim'], params['zy_dim'], n_domains, config, sampling_rate) 
     classifier = Transformer(input_size=params['zy_dim'], config=config) 
-
-    logger.info(feature_net)
-    logger.info(classifier)
-    logger.info("-"*100)
-
 
     # get function handles of loss and metrics
     criterion = getattr(module_loss, config['loss'])
