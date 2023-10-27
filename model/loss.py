@@ -15,7 +15,7 @@ def CrossEntropyLoss(output, target, classes_weights, device):
 
 ##### SupervisedContrastiveLoss        
 class SupervisedContrastiveLoss(nn.Module):
-    def __init__(self, tau=0.07):
+    def __init__(self, tau=0.1):
         super(SupervisedContrastiveLoss, self).__init__()
         self.tau = tau
 
@@ -27,7 +27,7 @@ class SupervisedContrastiveLoss(nn.Module):
             ),
             self.tau,
         )
-        return losses.NTXentLoss(temperature=self.tau)(logits, torch.squeeze(labels))
+        return losses.NTXentLoss(temperature=0.07)(logits, torch.squeeze(labels))
 
 def Self_SupervisedContrastiveLoss(x, criterion):
     LARGE_NUM = 1e9
