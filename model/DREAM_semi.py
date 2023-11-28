@@ -17,7 +17,6 @@ class VAE(nn.Module):
     def __init__(self, zd_dim, zy_dim, n_domains, config, d_type):
         super(VAE, self).__init__()
         self.zd_dim = zd_dim
-        self.zx_dim = 0
         self.zy_dim = zy_dim
         self.d_dim = n_domains
         params = config['hyper_params']
@@ -33,14 +32,12 @@ class VAE(nn.Module):
         self.transformer= Transform()
         self.criterion = nn.CrossEntropyLoss()
             
-        self.px = Decoder_ResNet(self.zd_dim, self.zx_dim, self.zy_dim, self.sampling_rate)
+        self.px = Decoder_ResNet(self.zd_dim, self.zy_dim, self.sampling_rate)
         self.pzy = p_decoder(self.y_dim, self.zy_dim)
         self.pzd = p_decoder(self.d_dim, self.zd_dim)
         
         self.qzy = Encoder_ResNet(self.zy_dim, self.sampling_rate)
         self.qzd = Encoder_ResNet(self.zd_dim, self.sampling_rate)
-        if self.zx_dim != 0:
-            self.qzx = Encoder_ResNet(self.zx_dim, self.sampling_rate)
 
         # auxiliary
         self.qd = aux_layer(self.zd_dim, self.d_dim)
@@ -58,32 +55,16 @@ class VAE(nn.Module):
         qzd = dist.Normal(zd_q_loc, zd_q_scale)   # Reparameterization trick
         zd_q = qzd.rsample() 
 
-        if self.zx_dim != 0:
-            zx_q_loc, zx_q_scale = self.qzx(x)
-            qzx = dist.Normal(zx_q_loc, zx_q_scale)
-            zx_q = qzx.rsample()
-        else:
-            qzx = None
-            zx_q = None
-
         zy_q_loc, zy_q_scale = self.qzy(x)          # Encode
         qzy = dist.Normal(zy_q_loc, zy_q_scale)     # Reparameterization trick
         zy_q = qzy.rsample()
 
         # Decode
-        x_recon = self.px(zx=zx_q, zy=zy_q, zd=zd_q)
+        x_recon = self.px(zy=zy_q, zd=zd_q)
         
         zd_p_loc, zd_p_scale = self.pzd(d)
         pzd = dist.Normal(zd_p_loc, zd_p_scale)
-        d_hat = self.qd(zd_q)
-
-        if self.zx_dim != 0:
-            zx_p_loc, zx_p_scale = torch.zeros(zd_p_loc.size()[0], self.zx_dim).cuda(),\
-                                   torch.ones(zd_p_loc.size()[0], self.zx_dim).cuda()
-            pzx = dist.Normal(zx_p_loc, zx_p_scale)
-        else:
-            pzx = None
-            
+        d_hat = self.qd(zd_q)            
 
         if y is not None:
             zy_p_loc, zy_p_scale = self.pzy(y)
@@ -102,11 +83,10 @@ class VAE(nn.Module):
         pzy = dist.Normal(zy_p_loc, zy_p_scale)
         y_hat = self.qy(zy_q)
 
-        return x_recon, d_hat, y_hat, qzd, pzd, zd_q, qzx, pzx, zx_q, qzy, pzy, zy_q, zy_q_loc
+        return x_recon, d_hat, y_hat, qzd, pzd, zd_q, qzy, pzy, zy_q, zy_q_loc
 
     def get_losses(self, x, y, d):        
         DIVA_losses, conts_losses, CE_class, CE_domain = 0, 0, 0, 0
-        KL_domain, KL_class, reconst_losses = 0, 0, 0
         
         d_target = d
         d_input = F.one_hot(d, num_classes= self.d_dim).float()
@@ -117,36 +97,23 @@ class VAE(nn.Module):
                 y_target = y[:, i]
                 y_input = F.one_hot(y_target, num_classes= self.y_dim).float() 
                   
-                x_recon, d_hat, y_hat, qzd, pzd, zd_q, qzx, pzx, zx_q, qzy, pzy, zy_q, features = self.forward(x=x_input, y=y_input, d=d_input)
+                x_recon, d_hat, y_hat, qzd, pzd, zd_q, qzy, pzy, zy_q, features = self.forward(x=x_input, y=y_input, d=d_input)
     
                 CE_x = F.mse_loss(x_recon, x_input, reduction='sum')
                 CE_d = F.cross_entropy(d_hat, d_target, reduction='sum')
     
                 zd_p_minus_zd_q = torch.sum(pzd.log_prob(zd_q) - qzd.log_prob(zd_q))
-                
-                if self.zx_dim != 0:
-                    KL_zx = torch.sum(pzx.log_prob(zx_q) - qzx.log_prob(zx_q))
-                else:
-                    KL_zx = 0
+                zy_p_minus_zy_q = torch.sum(pzy.log_prob(zy_q) - qzy.log_prob(zy_q))
             
                 CE_y = F.cross_entropy(y_hat, y_target, reduction='sum')
-                zy_p_minus_zy_q = torch.sum(pzy.log_prob(zy_q) - qzy.log_prob(zy_q))
                 
                 DIVA_losses += CE_x \
                    - self.beta_d * zd_p_minus_zd_q \
-                   - self.beta_x * KL_zx \
                    - self.beta_y * zy_p_minus_zy_q \
                    + self.aux_loss_multiplier_d * CE_d \
                    + self.aux_loss_multiplier_y * CE_y
                 
-                CE_class += CE_y    
-                CE_domain += CE_d
-                reconst_losses += CE_x
-                
                 conts_losses += self.contrastive_loss(features, y_target)*self.const_weight
-                
-                KL_domain += zd_p_minus_zd_q
-                KL_class += zy_p_minus_zy_q
                 
             else:
                 y_input = None
