@@ -28,7 +28,7 @@ class VAE(nn.Module):
         if self.augment:
             self.augmentor = Augmentation(sampling_rate=sampling_rate)
             
-        self.px = Decoder_ResNet(self.zd_dim, self.zx_dim, self.zy_dim, self.sampling_rate)
+        self.px = Decoder_ResNet(self.zd_dim, self.zy_dim, self.sampling_rate)
         self.pzd = p_decoder(self.d_dim, self.zd_dim)
         self.pzy = p_decoder(self.y_dim, self.zy_dim)
 
@@ -42,7 +42,7 @@ class VAE(nn.Module):
         self.aux_loss_multiplier_y = params['aux_loss_y']
         self.aux_loss_multiplier_d = params['aux_loss_d']
 
-        self.beta_x,self.beta_y,self.beta_d = params['beta_x'],params['beta_y'],params['beta_d']
+        self.beta_y, self.beta_d = params['beta_y'], params['beta_d']
         self.const_weight = params['const_weight']
 
     def forward(self, x, y, d):
