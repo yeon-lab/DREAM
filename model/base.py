@@ -201,7 +201,7 @@ class aux_layer(nn.Module):
         return loc
 
 
-class Transform:
+class Augmentation:
     def __init__(self, sampling_rate):
         self.size = sampling_rate*30
         
