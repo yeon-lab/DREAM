@@ -80,14 +80,17 @@ if __name__ == '__main__':
                       help='indices of GPUs to enable (default: all)')
     args.add_argument('-f', '--fold_id', type=str,
                       help='fold_id')
-    args.add_argument('-da', '--np_data_dir', type=str,
-                      help='Directory containing numpy files')
+    args.add_argument('--data_dir_sup', default='data_npz/edf_20_fpzcz', type=str,
+                      help='Directory containing numpy files for supervised learning')
+    args.add_argument('--data_dir_unsup', default='data_npz/edf_78_fpzcz', type=str,
+                      help='Directory containing numpy files for unsupervised learning ')
+    
     CustomArgs = collections.namedtuple('CustomArgs', 'flags type target')
     args2 = args.parse_args()
     fold_id = int(args2.fold_id)
     config = ConfigParser.from_args(args, fold_id)
     
-    folds_data = load_folds_semi_spervised(config["data_loader"]["args"]["num_folds"], fold_id)
+    folds_data = load_folds_semi_spervised(args2.data_dir_sup, args2.data_dir_unsup, config["data_loader"]["args"]["num_folds"])
     sampling_rate = 100
     
     main(config, fold_id, sampling_rate)
