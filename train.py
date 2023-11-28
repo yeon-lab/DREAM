@@ -85,10 +85,10 @@ if __name__ == '__main__':
     config = ConfigParser.from_args(args, fold_id)
     
     if "shhs" in args2.np_data_dir:
-        folds_data = load_shhs_folds(args2.np_data_dir, config["data_loader"]["args"]["num_folds"], fold_id)
+        folds_data = load_shhs_folds(args2.np_data_dir, config["data_loader"]["args"]["num_folds"])
         sampling_rate = 125
     else:
-        folds_data = load_edf_folds(args2.np_data_dir, config["data_loader"]["args"]["num_folds"], fold_id)
+        folds_data = load_edf_folds(args2.np_data_dir, config["data_loader"]["args"]["num_folds"])
         sampling_rate = 100
     
 
