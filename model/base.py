@@ -40,11 +40,11 @@ class Bottleneck(nn.Module):
 
 ##### Decoders
 class Decoder_ResNet(nn.Module):
-    def __init__(self, zd_dim, zx_dim, zy_dim, sampling_rate):
+    def __init__(self, zd_dim, zy_dim, sampling_rate):
         super(Decoder_ResNet, self).__init__()
         self.upsample1=nn.Upsample(scale_factor=2)
         if sampling_rate == 100:
-            self.dfc2 = nn.Linear(zd_dim + zx_dim + zy_dim, 6016)
+            self.dfc2 = nn.Linear(zd_dim + zy_dim, 6016)
             self.bn2 = nn.BatchNorm1d(6016)
             self.dfc1 = nn.Linear(6016, 32*1*94)
             self.bn1 = nn.BatchNorm1d(32*1*94)
@@ -52,7 +52,7 @@ class Decoder_ResNet(nn.Module):
             self.dconv2 = nn.ConvTranspose1d(16, 16, 5, padding = 3)
             self.dconv1 = nn.ConvTranspose1d(16, 1, 12, stride = 4, padding =0)
         else: ### sampling_rate == 125
-            self.dfc2 = nn.Linear(zd_dim + zx_dim + zy_dim, 7552)
+            self.dfc2 = nn.Linear(zd_dim + zy_dim, 7552)
             self.bn2 = nn.BatchNorm1d(7552)
             self.dfc1 = nn.Linear(7552, 32*1*117)
             self.bn1 = nn.BatchNorm1d(32*1*117)
@@ -70,11 +70,8 @@ class Decoder_ResNet(nn.Module):
                 nn.init.xavier_uniform_(m.weight)
                 nn.init.constant_(m.bias, 0)
 
-    def forward(self, zx, zy, zd): 
-        if zx is None:
-            x = torch.cat((zd, zy), dim=-1)
-        else:
-            x = torch.cat((zd, zx, zy), dim=-1)
+    def forward(self, zy, zd): 
+        x = torch.cat((zd, zy), dim=-1)
         batch_size = x.shape[0]
         x = self.dfc2(x)
         x = F.relu(self.bn2(x))
