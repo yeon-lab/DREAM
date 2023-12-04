@@ -37,8 +37,6 @@ class Trainer(BaseTrainer):
         
         self.feature_net.beta_d = min([self.config['hyper_params']['beta_d'], self.config['hyper_params']['beta_d'] * (epoch * 1.) / self.config['hyper_params']['warmup']])
         self.feature_net.beta_y = min([self.config['hyper_params']['beta_y'], self.config['hyper_params']['beta_y'] * (epoch * 1.) / self.config['hyper_params']['warmup']])
-        print('beta d:', self.feature_net.beta_d)
-        print('beta y:', self.feature_net.beta_y)
 
         outs = np.array([])
         trgs = np.array([])
@@ -64,12 +62,10 @@ class Trainer(BaseTrainer):
             x, y, d = x.to(self.device), y.to(self.device), d.to(self.device)
 
             self.featurenet_optimizer.zero_grad()
-            
             if iter_ % 2 == 0 and is_supervised:
-                all_loss, DIVA_loss, CE_class, CE_domain, Conts_loss, KL_domain, KL_class, Recon_loss = self.feature_net.get_losses(x=x, y=y, d=d)
+                all_loss = self.feature_net.get_losses(x=x, y=y, d=d)
             else: 
-                all_loss, DIVA_loss, CE_class, CE_domain, Conts_loss, KL_domain, KL_class, Recon_loss = self.feature_net.get_losses(x=x, y=None, d=d)
-                
+                all_loss = self.feature_net.get_losses(x=x, y=None, d=d)
             all_loss.backward()
             self.featurenet_optimizer.step()
             
@@ -77,27 +73,21 @@ class Trainer(BaseTrainer):
                 output = self.feature_net.predict(x)
                 loss = self.criterion(output, y, self.class_weights, self.device)
                 self.train_metrics.update('loss', loss.item())
-                
                 preds_ = output.data.max(1, keepdim=True)[1].cpu()    
                 outs = np.append(outs, preds_.numpy())
                 trgs = np.append(trgs, y.data.cpu().numpy())
 
             if iter_ % self.log_step == 0:
-                self.logger.debug('Train Epoch: {} {}  {} - Loss: {:.6f} ClassLoss: {:.6f} ContLoss: {:.6f}'.format(
+                self.logger.debug('Train Epoch: {} {}  {} - Loss: {:.6f}'.format(
                     epoch,
                     self._progress(iter_),
                     phase,
-                    all_loss.item(),
-                    loss.item(),
-                    Conts_loss.item()
-                ))
-
-                            
+                    all_loss.item()
+                ))        
         for met in self.metric_ftns:
             self.metrics.update(met.__name__, met(outs.reshape(-1,1), trgs.reshape(-1,1)))
             
         log = self.metrics.result()
-
 
         if self.do_validation:
             val_log = self._valid_feature_net()
