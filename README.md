@@ -1,7 +1,7 @@
-# Domain Invariant Representation Learning and Sleep Dynamics Modeling for Automatic Sleep Staging: A Deep Learning Framework
+# Domain Invariant Representation Learning and Sleep Dynamics Modeling for Automatic Sleep Staging
 
 ## Introduction
-This repository contains source code for paper "**DREAM**: Domain Invariant and Contrastive Representation for Sleep Dynamics" (ICDM 2022).
+This repository contains source code for paper "Domain Invariant Representation Learning and Sleep Dynamics Modeling for Automatic Sleep Staging".
 
 Sleep staging has become a critical task in diagnosing and treating sleep disorders to prevent sleep-related diseases. With rapidly growing large-scale public sleep databases and advances in machine learning, significant progress has been made toward automatic sleep staging. However, previous studies face some critical problems in sleep studies: (1) the heterogeneity of subjects' physiological signals, (2) the inability to extract meaningful information from unlabeled sleep signal data to improve predictive performances, (3) the difficulty in modeling correlations between sleep stages, and (4) the lack of an effective mechanism to quantify predictive uncertainty.
 
